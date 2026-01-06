@@ -47,17 +47,18 @@ function PagesContextPanel() {
   }, [client, error, isInitialized]);
 
   return (
-    <div className="p-5 border border-gray-300 rounded-lg max-w-2xl mx-auto my-8">
-      <h5>AI Content Assistant</h5>
+    <div className="p-5 mx-auto my-8 ">
+      <h4>OptiCore</h4>
       <p className="text-gray-700 text-sm">
         Enhance your content with AI-powered SEO analysis, broken link
         detection, brand compliance checking, and intelligent content
         generation.
       </p>
-      {isInitialized && pagesContext ? (
-        <div className="mt-5">
+      {/* {isInitialized && pagesContext ? ( */}
+      {true ? (
+        <div className="mt-8">
           <Tabs defaultValue="seo">
-            <TabsList className="mx-auto">
+            <TabsList className="mx-auto mb-3 overflow-x-auto max-w-full justify-start">
               <TabsTrigger value="seo">SEO Analysis</TabsTrigger>
               <TabsTrigger value="links">Broken Link Detection</TabsTrigger>
               <TabsTrigger value="compliance">Brand Compliance</TabsTrigger>
