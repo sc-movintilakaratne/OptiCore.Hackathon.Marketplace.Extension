@@ -21,8 +21,7 @@ interface Site {
 
 interface Page {
   id: string;
-  name?: string;
-  title?: string;
+  path?: string;
   [key: string]: any;
 }
 
@@ -257,7 +256,7 @@ export function SeoAnalysisTab() {
                     >
                       <div className="flex flex-col">
                         <span className="font-medium text-sm">
-                          {page.name || page.title || "Unnamed Page"}
+                          {page.path}
                         </span>
                         <span className="text-xs text-gray-500 mt-1">
                           ID: {page.id}
