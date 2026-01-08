@@ -13,7 +13,9 @@ export const getAllPagesBySite = async ({token, siteName}: getAllPagesBySiteType
       }
     );
     console.log(resp.data);
+    return resp.data;
   } catch (error) {
     console.log(error);
+    throw error;
   }
 };

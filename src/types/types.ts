@@ -25,6 +25,7 @@ export type getCollectionsType = {
 
 export type getSitesType = {
   token: string;
+  collectionId?: string
 };
 
 export type getAuthTokenTypes = {
