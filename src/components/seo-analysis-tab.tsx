@@ -5,6 +5,7 @@ import { getAllPagesBySite } from "../api/sitecore/getAllPagesBySite";
 import { getCollections } from "../api/sitecore/getCollections";
 import { getSites } from "../api/sitecore/getSites";
 import { getPageStructure } from "../api/sitecore/getPageStructure";
+import { getSeoScore, SeoScoreResponse } from "../api/seo/getSeoScore";
 import { fakeToken } from "../utils/utilities/token";
 
 interface Collection {
@@ -34,6 +35,9 @@ export function SeoAnalysisTab() {
   const [pageContent, setPageContent] = useState<any>({});
   const [token, setToken] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [seoScores, setSeoScores] = useState<Record<string, SeoScoreResponse>>({});
+  const [analyzingPages, setAnalyzingPages] = useState<Record<string, boolean>>({});
+  const [selectedPageForReport, setSelectedPageForReport] = useState<Page | null>(null);
   const [loading, setLoading] = useState({
     collections: false,
     sites: false,
@@ -42,12 +46,46 @@ export function SeoAnalysisTab() {
   const [error, setError] = useState<string | null>(null);
 
   const handleAnalyzePage = async (page: Page) => {
-    console.log(page);
-    const data = await getPageStructure({
-      token: fakeToken,
-      pageId: page.id
-    });
-    console.log(data.html);
+    try {
+      // Set analyzing state
+      setAnalyzingPages((prev) => ({ ...prev, [page.id]: true }));
+      setError(null);
+
+      // Get page HTML content
+      const pageData = await getPageStructure({
+        token: fakeToken,
+        pageId: page.id
+      });
+
+      if (!pageData?.html) {
+        throw new Error("Failed to retrieve page HTML content");
+      }
+
+      // Get SEO score from external API
+      const seoScore = await getSeoScore({
+        html: pageData.html,
+        url: page.path,
+      });
+
+      // Store the SEO score
+      setSeoScores((prev) => ({
+        ...prev,
+        [page.id]: seoScore,
+      }));
+
+      // Set the page for report display
+      setSelectedPageForReport(page);
+    } catch (err) {
+      console.error("Error analyzing page:", err);
+      setError(`Failed to analyze page: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      // Clear analyzing state
+      setAnalyzingPages((prev) => {
+        const newState = { ...prev };
+        delete newState[page.id];
+        return newState;
+      });
+    }
   };
 
   const fetchCollections = async () => {
@@ -157,6 +195,7 @@ export function SeoAnalysisTab() {
     if (!selectedSite) {
       setPages([]);
       setSearchQuery(""); // Reset search when site changes
+      setSelectedPageForReport(null); // Clear report when site changes
       return;
     }
 
@@ -312,34 +351,183 @@ export function SeoAnalysisTab() {
                 ) : (
                   <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
                     <ul className="divide-y divide-gray-200">
-                      {filteredPages.map((page) => (
-                        <li
-                          key={page.id}
-                          className="px-4 py-3 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col flex-1">
-                              <span className="font-medium text-sm">
-                                {page.path || page.id}
-                              </span>
-                              <span className="text-xs text-gray-500 mt-1">
-                                ID: {page.id}
-                              </span>
+                      {filteredPages.map((page) => {
+                        const isAnalyzing = analyzingPages[page.id];
+                        return (
+                          <li
+                            key={page.id}
+                            className="px-4 py-3 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium text-sm">
+                                  {page.path || page.id}
+                                </span>
+                                <span className="text-xs text-gray-500 mt-1">
+                                  ID: {page.id}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleAnalyzePage(page)}
+                                disabled={isAnalyzing}
+                                className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                              >
+                                {isAnalyzing ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    <span>Analyzing...</span>
+                                  </>
+                                ) : (
+                                  "Analyze page"
+                                )}
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleAnalyzePage(page)}
-                              className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                            >
-                              Analyze page
-                            </button>
-                          </div>
-                        </li>
-                      ))}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* SEO Report Section */}
+        {selectedPageForReport && seoScores[selectedPageForReport.id] && (
+          <div className="mt-6 border border-gray-200 rounded-lg p-6 bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-gray-800">SEO Report</h4>
+              <button
+                onClick={() => setSelectedPageForReport(null)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                Close
+              </button>
+            </div>
+            
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">
+                <span className="font-medium">Page:</span> {selectedPageForReport.path || selectedPageForReport.id}
+              </p>
+              <p className="text-xs text-gray-500">
+                <span className="font-medium">ID:</span> {selectedPageForReport.id}
+              </p>
+            </div>
+
+            {(() => {
+              const seoScore = seoScores[selectedPageForReport.id];
+              const getScoreColor = (score: number) => {
+                if (score >= 80) return "text-green-600 bg-green-50 border-green-200";
+                if (score >= 60) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+                return "text-red-600 bg-red-50 border-red-200";
+              };
+              const getGradeColor = (grade: string) => {
+                if (grade === "A") return "text-green-700 bg-green-100 border-green-300";
+                if (grade === "B") return "text-blue-700 bg-blue-100 border-blue-300";
+                if (grade === "C") return "text-yellow-700 bg-yellow-100 border-yellow-300";
+                if (grade === "D") return "text-orange-700 bg-orange-100 border-orange-300";
+                return "text-red-700 bg-red-100 border-red-300";
+              };
+
+              return (
+                <>
+                  {/* Overall Score */}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className={`px-6 py-4 rounded-lg border-2 ${getScoreColor(seoScore.score)}`}>
+                        <div className="text-3xl font-bold">{seoScore.score}</div>
+                        <div className="text-xs font-medium mt-1">Score / 100</div>
+                      </div>
+                      {seoScore.grade && (
+                        <div className={`px-6 py-4 rounded-lg border-2 ${getGradeColor(seoScore.grade)}`}>
+                          <div className="text-3xl font-bold">{seoScore.grade}</div>
+                          <div className="text-xs font-medium mt-1">Grade</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  {seoScore.details && (
+                    <div className="mb-6">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Analysis Details</h5>
+                      <div className="space-y-3">
+                        {seoScore.details.title && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Title Tag</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.title.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.title.score}/15</span>
+                          </div>
+                        )}
+                        {seoScore.details.metaDescription && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Meta Description</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.metaDescription.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.metaDescription.score}/15</span>
+                          </div>
+                        )}
+                        {seoScore.details.headings && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Headings</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.headings.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.headings.score}/20</span>
+                          </div>
+                        )}
+                        {seoScore.details.images && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Images</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.images.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.images.score}/15</span>
+                          </div>
+                        )}
+                        {seoScore.details.links && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Links</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.links.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.links.score}/10</span>
+                          </div>
+                        )}
+                        {seoScore.details.content && (
+                          <div className="flex items-start justify-between p-3 bg-gray-50 rounded-md">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-700">Content</span>
+                              <p className="text-xs text-gray-600 mt-1">{seoScore.details.content.message}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800">{seoScore.details.content.score}/15</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendations */}
+                  {seoScore.recommendations && seoScore.recommendations.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Recommendations</h5>
+                      <ul className="space-y-2">
+                        {seoScore.recommendations.map((rec, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                            <span className="text-blue-600 mt-1">•</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
