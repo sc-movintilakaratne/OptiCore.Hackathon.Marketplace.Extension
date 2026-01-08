@@ -33,6 +33,7 @@ export function SeoAnalysisTab() {
   const [pages, setPages] = useState<Page[]>([]);
   const [pageContent, setPageContent] = useState<any>({});
   const [token, setToken] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState({
     collections: false,
     sites: false,
@@ -151,11 +152,21 @@ export function SeoAnalysisTab() {
   useEffect(() => {
     if (!selectedSite) {
       setPages([]);
+      setSearchQuery(""); // Reset search when site changes
       return;
     }
 
     fetchPages();
   }, [selectedSite]);
+
+  // Filter pages based on search query
+  const filteredPages = pages.filter((page) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    const pagePath = (page.path || "").toLowerCase();
+    const pageId = (page.id || "").toLowerCase();
+    return pagePath.includes(query) || pageId.includes(query);
+  });
 
   return (
     <div>
@@ -255,9 +266,16 @@ export function SeoAnalysisTab() {
         {/* Pages List */}
         {selectedSite && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Pages ({pages.length})
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Pages ({pages.length})
+              </label>
+              {!loading.pages && pages.length > 0 && (
+                <span className="text-xs text-gray-500">
+                  {filteredPages.length} {filteredPages.length === 1 ? 'result' : 'results'}
+                </span>
+              )}
+            </div>
             {loading.pages ? (
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
@@ -270,33 +288,53 @@ export function SeoAnalysisTab() {
                 </p>
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {pages.map((page) => (
-                    <li
-                      key={page.id}
-                      className="px-4 py-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col flex-1">
-                          <span className="font-medium text-sm">
-                            {page.path || page.id}
-                          </span>
-                          <span className="text-xs text-gray-500 mt-1">
-                            ID: {page.id}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleAnalyzePage(page)}
-                          className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              <>
+                {/* Search Bar */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search pages by path or ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+                {filteredPages.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                    <p className="text-gray-600 text-sm">
+                      No pages found matching "{searchQuery}"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
+                    <ul className="divide-y divide-gray-200">
+                      {filteredPages.map((page) => (
+                        <li
+                          key={page.id}
+                          className="px-4 py-3 hover:bg-gray-50 transition-colors"
                         >
-                          Analyze page
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col flex-1">
+                              <span className="font-medium text-sm">
+                                {page.path || page.id}
+                              </span>
+                              <span className="text-xs text-gray-500 mt-1">
+                                ID: {page.id}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleAnalyzePage(page)}
+                              className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            >
+                              Analyze page
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
