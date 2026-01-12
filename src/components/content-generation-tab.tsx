@@ -2,7 +2,18 @@
 
 import React, { useState } from "react";
 
-// Define the shape of our API response
+// -----------------------------------------------------------------------------
+// 1. DEFINE YOUR BRANDS & IDs HERE
+// -----------------------------------------------------------------------------
+// REPLACE these placeholder IDs ("2005", etc.) with the real Entity IDs
+// you found in your Content Hub browser URL.
+const BRAND_OPTIONS = [
+  { name: "Essential Living", id: "48016" },
+  { name: "Skywings", id: "48107" },
+  { name: "Forma-lux", id: "48016" },
+  { name: "Nova-Medical", id: "48017" },
+];
+
 interface ApiResponse {
   success: boolean;
   assetId?: string;
@@ -12,49 +23,103 @@ interface ApiResponse {
 
 export default function ContentGenerationTab() {
   const [loading, setLoading] = useState(false);
+
+  // New state for upload loading status
+  const [isUploading, setIsUploading] = useState(false);
+
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
 
   // Form State
-  const [brandName, setBrandName] = useState("Nike");
+  // Default to the first brand in our list
+  const [brandName, setBrandName] = useState(BRAND_OPTIONS[0].name);
+  const [selectedBrandId, setSelectedBrandId] = useState(BRAND_OPTIONS[0].id);
   const [description, setDescription] = useState("");
 
+  //real handle generate function
+  // const handleGenerate = async () => {
+  //   if (!description) return alert("Please enter a description");
+
+  //   setLoading(true);
+  //   setGeneratedImage(null);
+  //   setAssetId(null);
+
+  //   try {
+  //     const res = await fetch("/api/generate-asset", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         brandName, // We still send the Name to the AI for context
+  //         productDescription: description,
+  //       }),
+  //     });
+
+  //     const data = (await res.json()) as ApiResponse;
+
+  //     if (!data.success) throw new Error(data.error || "Generation failed");
+
+  //     setGeneratedImage(data.imagePreview!);
+  //     setAssetId(data.assetId!);
+  //   } catch (error: any) {
+  //     console.error(error);
+  //     alert(`Error: ${error.message}`);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const handleGenerate = async () => {
-    if (!description) return alert("Please enter a description");
+    if (!description)
+      return alert("Please enter a description (even for mock)");
 
     setLoading(true);
-    setGeneratedImage(null);
-    setAssetId(null);
 
-    try {
-      // ---------------------------------------------------------
-      // NOTE: Using the Mock/Real toggle here based on your setup
-      // ---------------------------------------------------------
-      const res = await fetch("/api/generate-asset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandName, productDescription: description }),
-      });
+    // Simulate a short delay like a real AI
+    setTimeout(() => {
+      const mockImage =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
 
-      const data = (await res.json()) as ApiResponse;
-
-      if (!data.success) throw new Error(data.error || "Generation failed");
-
-      setGeneratedImage(data.imagePreview!);
-      setAssetId(data.assetId!);
-    } catch (error: any) {
-      console.error(error);
-      alert(`Error: ${error.message}`);
-    } finally {
+      setGeneratedImage(mockImage);
+      setAssetId("mock-asset-id-" + Date.now());
       setLoading(false);
-    }
+    }, 1000);
   };
 
-  const handleUploadToContentHub = () => {
-    alert(
-      `Initiating Upload Workflow for Asset ID: ${assetId || "NEW-ASSET"}...`
-    );
-    // Add your Sitecore upload logic here
+  // ---------------------------------------------------------------------------
+  // 2. THE UPLOAD FUNCTION
+  // ---------------------------------------------------------------------------
+  const handleUploadToContentHub = async () => {
+    if (!generatedImage) return;
+
+    setIsUploading(true);
+
+    try {
+      // Call our new API Route
+      const response = await fetch("/api/upload-asset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: generatedImage,
+          brandId: selectedBrandId, // Send the ID, not the name!
+          fileName: `ai-gen-${Date.now()}.png`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(
+          `Upload Successful!\n\nNew Asset ID: ${result.assetId}\nView it here: ${result.url}`
+        );
+      } else {
+        throw new Error(result.error || "Unknown upload error");
+      }
+    } catch (error: any) {
+      console.error("Upload failed", error);
+      alert(` Upload Failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleReset = () => {
@@ -65,7 +130,7 @@ export default function ContentGenerationTab() {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Header Section (Always Visible for Context) */}
+      {/* Header Section */}
       <div className="px-4 py-4 border-b border-gray-100 bg-white sticky top-0 z-10">
         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <span className="bg-violet-100 text-violet-600 p-1.5 rounded-lg">
@@ -87,10 +152,9 @@ export default function ContentGenerationTab() {
         </h2>
       </div>
 
-      {/* SUCCESS STATE (Only shows when image is generated)                */}
+      {/* VIEW 1: SUCCESS STATE (Image Generated) */}
       {generatedImage ? (
         <div className="flex-1 flex flex-col p-6 animate-in fade-in slide-in-from-bottom-8 duration-500 overflow-y-auto">
-          {/* 2. Upload To Content Hub Component */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
             <div className="flex items-start gap-3">
               <div className="bg-green-100 p-2 rounded-full text-green-600 shrink-0">
@@ -113,10 +177,10 @@ export default function ContentGenerationTab() {
                   Asset Ready for Upload
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Review the asset above. If it meets brand guidelines, push it
-                  directly to the DAM.
+                  Review the asset above. It will be tagged with{" "}
+                  <strong>{brandName}</strong> (ID: {selectedBrandId}).
                 </p>
-                <div className="w-full relative rounded-2xl overflow-hidden shadow-2xl border border-gray-100 mb-6 group">
+                <div className="w-full relative rounded-2xl overflow-hidden shadow-2xl border border-gray-100 mb-6 group mt-3">
                   <img
                     src={generatedImage}
                     alt="AI Result"
@@ -134,27 +198,62 @@ export default function ContentGenerationTab() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleUploadToContentHub}
-                className="flex-1 bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg  transition-colors shadow-sm flex items-center justify-center gap-2"
+                disabled={isUploading} // Disable button while uploading
+                className={`flex-1 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2
+                  ${
+                    isUploading
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-tr from-violet-600 to-indigo-600 hover:shadow-md"
+                  }`}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                  />
-                </svg>
-                Upload to Content Hub
+                {isUploading ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                      />
+                    </svg>
+                    Upload to Content Hub
+                  </>
+                )}
               </button>
 
               <button
                 onClick={handleReset}
-                className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isUploading}
+                className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Discard
               </button>
@@ -162,9 +261,7 @@ export default function ContentGenerationTab() {
           </div>
         </div>
       ) : (
-        /* -------------------------------------------------------------------------- */
-        /* VIEW 2: INPUT FORM (Shows when NO image exists)                            */
-        /* -------------------------------------------------------------------------- */
+        /* VIEW 2: INPUT FORM */
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Step 1: Context */}
@@ -173,20 +270,26 @@ export default function ContentGenerationTab() {
                 1. Brand Context
               </label>
               <div className="relative">
+                {/* 3. UPDATED SELECT LOGIC 
+                  Uses ID as value, but updates Name state for AI prompt
+                */}
                 <select
                   className="w-full pl-3 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none"
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
+                  value={selectedBrandId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSelectedBrandId(newId);
+                    // Find the name that matches this ID so we can send it to the AI
+                    const brand = BRAND_OPTIONS.find((b) => b.id === newId);
+                    if (brand) setBrandName(brand.name);
+                  }}
                   disabled={loading}
                 >
-                  <option value="Essential Living ">
-                    Essential Living (Luxury, Energetic)
-                  </option>
-                  <option value="Skywings">Skywings (Travel, Earthy)</option>
-                  <option value="Forma-lux ">Forma-lux (Retail, Clean)</option>
-                  <option value="Nova-Medical">
-                    Nova-Medical (Healthcare, Hospital)
-                  </option>
+                  {BRAND_OPTIONS.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
                   <svg
@@ -220,7 +323,7 @@ export default function ContentGenerationTab() {
               />
             </div>
 
-            {/* Loading Animation (Shows WHILE loading, inside form area) */}
+            {/* Loading Animation */}
             {loading && (
               <div className="text-center p-8 w-full flex flex-col items-center justify-center animate-in fade-in duration-500">
                 <div className="relative flex items-center justify-center w-24 h-24 mb-6">
@@ -255,13 +358,11 @@ export default function ContentGenerationTab() {
             )}
           </div>
 
-          {/* Generate Button (Hidden when loading) */}
           {!loading && (
             <button
               onClick={handleGenerate}
               disabled={!description}
-              className={`
-                relative w-9/10 mx-auto block py-3 px-4 mb-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 ease-out transform overflow-hidden group
+              className={`relative w-9/10 mx-auto block py-3 px-4 mb-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 ease-out transform overflow-hidden group
                 ${
                   !description
                     ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
