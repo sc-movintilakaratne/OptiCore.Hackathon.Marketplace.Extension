@@ -31,3 +31,12 @@ export type getSitesType = {
 export type getAuthTokenTypes = {
   setToken: Dispatch<SetStateAction<string | undefined>>;
 };
+
+export type updatePageFieldType = {
+  token: string;
+  pageId: string;
+  fieldName: string;
+  fieldValue: string;
+  language?: string;
+  version?: string;
+};

@@ -5,6 +5,7 @@ import { getAllPagesBySite } from "../api/sitecore/getAllPagesBySite";
 import { getCollections } from "../api/sitecore/getCollections";
 import { getSites } from "../api/sitecore/getSites";
 import { getPageStructure } from "../api/sitecore/getPageStructure";
+import { updatePageField } from "../api/sitecore/updatePageField";
 import { getSeoScore, SeoScoreResponse } from "../api/seo/getSeoScore";
 import { analyzeHeadSeo, HeadSeoScoreResponse } from "../api/seo/getHeadSeoScore";
 import { fakeToken } from "../utils/utilities/token";
@@ -44,6 +45,10 @@ export function SeoAnalysisTab() {
   const [headSeoScores, setHeadSeoScores] = useState<Record<string, HeadSeoScoreResponse>>({});
   const [expandedHeadSeoItems, setExpandedHeadSeoItems] = useState<Record<string, Set<string>>>({});
   const [expandedSeoItems, setExpandedSeoItems] = useState<Record<string, Set<string>>>({});
+  const [headSeoFieldValues, setHeadSeoFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [seoFieldValues, setSeoFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [suggestingFields, setSuggestingFields] = useState<Record<string, Record<string, boolean>>>({});
+  const [savingFields, setSavingFields] = useState<Record<string, Record<string, boolean>>>({});
   const [loading, setLoading] = useState({
     collections: false,
     sites: false,
@@ -77,6 +82,17 @@ export function SeoAnalysisTab() {
       setSeoScores((prev) => ({
         ...prev,
         [page.id]: seoScore,
+      }));
+
+      // Initialize field values
+      const initialValues: Record<string, string> = {};
+      const details = seoScore.details || {};
+      Object.keys(details).forEach((key) => {
+        initialValues[key] = "";
+      });
+      setSeoFieldValues((prev) => ({
+        ...prev,
+        [page.id]: initialValues,
       }));
 
       // Set the page for report display
@@ -119,6 +135,17 @@ export function SeoAnalysisTab() {
         [page.id]: headSeoResults,
       }));
 
+      // Initialize field values with current values from results
+      const initialValues: Record<string, string> = {};
+      Object.keys(headSeoResults).forEach((key) => {
+        const field = headSeoResults[key as keyof HeadSeoScoreResponse];
+        initialValues[key] = field.value || "";
+      });
+      setHeadSeoFieldValues((prev) => ({
+        ...prev,
+        [page.id]: initialValues,
+      }));
+
       // Set the page for head SEO report display
       setSelectedPageForHeadSeo(page);
     } catch (err) {
@@ -129,6 +156,188 @@ export function SeoAnalysisTab() {
       setAnalyzingHeadSeo((prev) => {
         const newState = { ...prev };
         delete newState[page.id];
+        return newState;
+      });
+    }
+  };
+
+  const handleHeadSeoFieldChange = (pageId: string, fieldKey: string, value: string) => {
+    setHeadSeoFieldValues((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: value,
+      },
+    }));
+  };
+
+  const handleSeoFieldChange = (pageId: string, fieldKey: string, value: string) => {
+    setSeoFieldValues((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: value,
+      },
+    }));
+  };
+
+  const handleSuggestHeadSeo = async (pageId: string, fieldKey: string) => {
+    setSuggestingFields((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: true,
+      },
+    }));
+
+    try {
+      // TODO: Implement actual suggestion logic using AI or API
+      // For now, this is a placeholder
+      const currentValue = headSeoFieldValues[pageId]?.[fieldKey] || "";
+      const suggestion = `Suggested ${fieldKey} based on analysis...`;
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setHeadSeoFieldValues((prev) => ({
+        ...prev,
+        [pageId]: {
+          ...(prev[pageId] || {}),
+          [fieldKey]: suggestion,
+        },
+      }));
+    } catch (err) {
+      console.error("Error generating suggestion:", err);
+      setError(`Failed to generate suggestion: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSuggestingFields((prev) => {
+        const newState = { ...prev };
+        if (newState[pageId]) {
+          delete newState[pageId][fieldKey];
+        }
+        return newState;
+      });
+    }
+  };
+
+  const handleSuggestSeo = async (pageId: string, fieldKey: string) => {
+    setSuggestingFields((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: true,
+      },
+    }));
+
+    try {
+      // TODO: Implement actual suggestion logic using AI or API
+      // For now, this is a placeholder
+      const currentValue = seoFieldValues[pageId]?.[fieldKey] || "";
+      const suggestion = `Suggested ${fieldKey} based on analysis...`;
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setSeoFieldValues((prev) => ({
+        ...prev,
+        [pageId]: {
+          ...(prev[pageId] || {}),
+          [fieldKey]: suggestion,
+        },
+      }));
+    } catch (err) {
+      console.error("Error generating suggestion:", err);
+      setError(`Failed to generate suggestion: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSuggestingFields((prev) => {
+        const newState = { ...prev };
+        if (newState[pageId]) {
+          delete newState[pageId][fieldKey];
+        }
+        return newState;
+      });
+    }
+  };
+
+  const handleSaveHeadSeo = async (pageId: string, fieldKey: string) => {
+    const fieldValue = headSeoFieldValues[pageId]?.[fieldKey];
+    
+    if (!fieldValue || !fieldValue.trim()) {
+      setError("Please enter a value before saving");
+      return;
+    }
+
+    setSavingFields((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: true,
+      },
+    }));
+
+    try {
+      setError(null);
+      
+      await updatePageField({
+        token: fakeToken,
+        pageId,
+        fieldName: fieldKey,
+        fieldValue: fieldValue.trim(),
+      });
+
+      // Show success message (you could add a success state if needed)
+      console.log(`Successfully saved ${fieldKey} for page ${pageId}`);
+    } catch (err) {
+      console.error("Error saving field:", err);
+      setError(`Failed to save ${fieldKey}: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSavingFields((prev) => {
+        const newState = { ...prev };
+        if (newState[pageId]) {
+          delete newState[pageId][fieldKey];
+        }
+        return newState;
+      });
+    }
+  };
+
+  const handleSaveSeo = async (pageId: string, fieldKey: string) => {
+    const fieldValue = seoFieldValues[pageId]?.[fieldKey];
+    
+    if (!fieldValue || !fieldValue.trim()) {
+      setError("Please enter a value before saving");
+      return;
+    }
+
+    setSavingFields((prev) => ({
+      ...prev,
+      [pageId]: {
+        ...(prev[pageId] || {}),
+        [fieldKey]: true,
+      },
+    }));
+
+    try {
+      setError(null);
+      
+      await updatePageField({
+        token: fakeToken,
+        pageId,
+        fieldName: fieldKey,
+        fieldValue: fieldValue.trim(),
+      });
+
+      // Show success message (you could add a success state if needed)
+      console.log(`Successfully saved ${fieldKey} for page ${pageId}`);
+    } catch (err) {
+      console.error("Error saving field:", err);
+      setError(`Failed to save ${fieldKey}: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSavingFields((prev) => {
+        const newState = { ...prev };
+        if (newState[pageId]) {
+          delete newState[pageId][fieldKey];
+        }
         return newState;
       });
     }
@@ -637,11 +846,53 @@ export function SeoAnalysisTab() {
                               <div className="px-4 pb-4 pt-2 border-t border-gray-200">
                                 <p className="text-xs text-gray-600 mb-3 mt-2">{item.data.message}</p>
                                 {item.data.value && (
-                                  <div className="p-3 bg-white rounded border border-gray-200">
-                                    <p className="text-xs font-medium text-gray-700 mb-1">Value:</p>
+                                  <div className="p-3 bg-white rounded border border-gray-200 mb-3">
+                                    <p className="text-xs font-medium text-gray-700 mb-1">Current Value:</p>
                                     <p className="text-xs text-gray-800 break-words">{item.data.value}</p>
                                   </div>
                                 )}
+                                <div className="space-y-2">
+                                  <label className="block text-xs font-medium text-gray-700">
+                                    {item.label}
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={headSeoFieldValues[selectedPageForHeadSeo.id]?.[item.key] || ""}
+                                      onChange={(e) => handleHeadSeoFieldChange(selectedPageForHeadSeo.id, item.key, e.target.value)}
+                                      placeholder={`Enter ${item.label.toLowerCase()}...`}
+                                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <button
+                                      onClick={() => handleSuggestHeadSeo(selectedPageForHeadSeo.id, item.key)}
+                                      disabled={suggestingFields[selectedPageForHeadSeo.id]?.[item.key] || savingFields[selectedPageForHeadSeo.id]?.[item.key]}
+                                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                                    >
+                                      {suggestingFields[selectedPageForHeadSeo.id]?.[item.key] ? (
+                                        <span className="flex items-center gap-2">
+                                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                          Generating...
+                                        </span>
+                                      ) : (
+                                        "Suggest"
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleSaveHeadSeo(selectedPageForHeadSeo.id, item.key)}
+                                      disabled={savingFields[selectedPageForHeadSeo.id]?.[item.key] || suggestingFields[selectedPageForHeadSeo.id]?.[item.key] || !headSeoFieldValues[selectedPageForHeadSeo.id]?.[item.key]?.trim()}
+                                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                                    >
+                                      {savingFields[selectedPageForHeadSeo.id]?.[item.key] ? (
+                                        <span className="flex items-center gap-2">
+                                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                          Saving...
+                                        </span>
+                                      ) : (
+                                        "Save"
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -826,7 +1077,49 @@ export function SeoAnalysisTab() {
                               </button>
                               {isExpanded && (
                                 <div className="px-4 pb-4 pt-2 border-t border-gray-200">
-                                  <p className="text-xs text-gray-600 mt-2">{item.data.message}</p>
+                                  <p className="text-xs text-gray-600 mb-3 mt-2">{item.data.message}</p>
+                                  <div className="space-y-2">
+                                    <label className="block text-xs font-medium text-gray-700">
+                                      {item.label}
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={seoFieldValues[selectedPageForReport.id]?.[item.key] || ""}
+                                        onChange={(e) => handleSeoFieldChange(selectedPageForReport.id, item.key, e.target.value)}
+                                        placeholder={`Enter ${item.label.toLowerCase()}...`}
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      />
+                                      <button
+                                        onClick={() => handleSuggestSeo(selectedPageForReport.id, item.key)}
+                                        disabled={suggestingFields[selectedPageForReport.id]?.[item.key] || savingFields[selectedPageForReport.id]?.[item.key]}
+                                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                                      >
+                                        {suggestingFields[selectedPageForReport.id]?.[item.key] ? (
+                                          <span className="flex items-center gap-2">
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                            Generating...
+                                          </span>
+                                        ) : (
+                                          "Suggest"
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleSaveSeo(selectedPageForReport.id, item.key)}
+                                        disabled={savingFields[selectedPageForReport.id]?.[item.key] || suggestingFields[selectedPageForReport.id]?.[item.key] || !seoFieldValues[selectedPageForReport.id]?.[item.key]?.trim()}
+                                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                                      >
+                                        {savingFields[selectedPageForReport.id]?.[item.key] ? (
+                                          <span className="flex items-center gap-2">
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                            Saving...
+                                          </span>
+                                        ) : (
+                                          "Save"
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
