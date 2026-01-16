@@ -1,4 +1,3 @@
-// src/app/api/generate-asset/route.ts
 import { NextResponse } from "next/server";
 import { generateImage } from "@/src/lib/google-ai";
 
@@ -7,14 +6,12 @@ export async function POST(req: Request) {
     const { brandName, productDescription } = await req.json();
 
     // 1. Call Google AI
-    // result will be a Buffer (real image) or String (if mock)
     const imageResult = await generateImage(productDescription, brandName);
 
     let imagePreviewUrl = "";
 
     // 2. Convert to Base64 for Frontend Display
     if (typeof imageResult === "string") {
-      // If it's already a string (e.g., from a fallback), use it
       imagePreviewUrl = imageResult.startsWith("data:")
         ? imageResult
         : `data:image/png;base64,${imageResult}`;

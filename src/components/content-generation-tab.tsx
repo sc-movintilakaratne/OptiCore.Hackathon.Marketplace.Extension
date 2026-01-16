@@ -5,8 +5,6 @@ import React, { useState } from "react";
 // -----------------------------------------------------------------------------
 // 1. DEFINE YOUR BRANDS & IDs HERE
 // -----------------------------------------------------------------------------
-// REPLACE these placeholder IDs ("2005", etc.) with the real Entity IDs
-// you found in your Content Hub browser URL.
 const BRAND_OPTIONS = [
   { name: "Essential Living", id: "48016" },
   { name: "Skywings", id: "48107" },
@@ -23,15 +21,25 @@ interface ApiResponse {
 
 export default function ContentGenerationTab() {
   const [loading, setLoading] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // New state for upload loading status
   const [isUploading, setIsUploading] = useState(false);
 
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
 
+  // Notification state
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "info" | "error";
+  } | null>(null);
+
+  const showToast = (message: string, type: "info" | "error" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   // Form State
-  // Default to the first brand in our list
   const [brandName, setBrandName] = useState(BRAND_OPTIONS[0].name);
   const [selectedBrandId, setSelectedBrandId] = useState(BRAND_OPTIONS[0].id);
   const [description, setDescription] = useState("");
@@ -73,8 +81,6 @@ export default function ContentGenerationTab() {
   //     return alert("Please enter a description (even for mock)");
 
   //   setLoading(true);
-
-  //   // Simulate a short delay like a real AI
   //   setTimeout(() => {
   //     const mockImage =
   //       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
@@ -94,13 +100,12 @@ export default function ContentGenerationTab() {
     setIsUploading(true);
 
     try {
-      // Call our new API Route
       const response = await fetch("/api/upload-asset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: generatedImage,
-          brandId: selectedBrandId, // Send the ID, not the name!
+          brandId: selectedBrandId,
           fileName: `ai-gen-${Date.now()}.png`,
         }),
       });
@@ -108,15 +113,17 @@ export default function ContentGenerationTab() {
       const result = await response.json();
 
       if (result.success) {
-        alert(
-          `Upload Successful!\n\nNew Asset ID: ${result.assetId}\nView it here: ${result.url}`
+        showToast(
+          `Upload Successful! Asset Created (ID: ${result.assetId})`,
+          "info"
         );
       } else {
         throw new Error(result.error || "Unknown upload error");
       }
     } catch (error: any) {
       console.error("Upload failed", error);
-      alert(` Upload Failed: ${error.message}`);
+
+      showToast(`Upload Failed: ${error.message}`, "error");
     } finally {
       setIsUploading(false);
     }
@@ -128,16 +135,35 @@ export default function ContentGenerationTab() {
     setDescription("");
   };
 
-  const handleDownload = () => {
+  // ---------------------------------------------------------------------------
+  // UPDATED DOWNLOAD FUNCTION (Iframe Compatible)
+  // ---------------------------------------------------------------------------
+  const handleDownload = async () => {
     if (!generatedImage) return;
 
-    // Create a temporary link element
-    const link = document.createElement("a");
-    link.href = generatedImage;
-    link.download = `opticore-asset-${Date.now()}.png`; // Unique filename
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(generatedImage);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `opticore-asset-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      showToast(
+        "If download didn't start, Please Right-Click the image and select 'Save Image As'",
+        "info"
+      );
+    } catch (error) {
+      console.warn("Download blocked by iframe:", error);
+      showToast(
+        "Download blocked by security. Please Right-Click image -> 'Save Image As'",
+        "error"
+      );
+    }
   };
 
   return (
@@ -177,7 +203,6 @@ export default function ContentGenerationTab() {
               />
 
               {/* --- TOP OVERLAY (Text & Close Button) --- */}
-              {/* Gradient background ensures text is readable on any image */}
               <div className="absolute inset-x-0 top-0 p-5 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start">
                 {/* Text Content */}
                 <div className="text-white space-y-1">
@@ -208,11 +233,11 @@ export default function ContentGenerationTab() {
                   </p>
                 </div>
 
-                {/* X (Discard) Button */}
+                {/* Discard Button */}
                 <button
                   onClick={handleReset}
                   disabled={isUploading}
-                  className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white rounded-full p-2 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="bg-white/10 hover:bg-red-400/50 backdrop-blur-md border border-white/10 text-white rounded-full p-2 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                   title="Discard & Reset"
                 >
                   <svg
@@ -232,36 +257,69 @@ export default function ContentGenerationTab() {
               </div>
 
               {/* --- BOTTOM OVERLAY (AI Badge & Download) --- */}
-              <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
-                {/* Existing Badge */}
-                <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 bg-black/40 backdrop-blur-sm px-2 py-1.5 rounded border border-white/10 pointer-events-none cursor-default">
+              <div className="absolute inset-x-0 bottom-0 p-4 flex justify-between items-center z-10 pointer-events-none">
+                {/* LEFT: AI Badge (Hover Only) */}
+                <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 bg-black/40 backdrop-blur-sm px-2 py-1.5 rounded border border-white/10 cursor-default opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto">
                   Generated by Opticore AI
                 </span>
 
-                {/* NEW Download Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload();
-                  }}
-                  className="p-1.5 bg-black/40 hover:bg-black/70 backdrop-blur-sm rounded border border-white/10 text-white/70 hover:text-white transition-all active:scale-95"
-                  title="Download Image"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                    className="w-4 h-4"
+                {/* RIGHT: Action Buttons  */}
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  {/* PREVIEW BUTTON */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPreviewOpen(true);
+                    }}
+                    className="p-2 bg-black/40 hover:bg-black/70 backdrop-blur-sm rounded-full border border-white/10 text-white/70 hover:text-white transition-all active:scale-95 transform hover:scale-110 shadow-sm"
+                    title="Preview Full Image"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* DOWNLOAD BUTTON */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload();
+                    }}
+                    className="p-2 bg-black/40 hover:bg-black/70 backdrop-blur-sm rounded-full border border-white/10 text-white/70 hover:text-white transition-all active:scale-95 transform hover:scale-110 shadow-sm"
+                    title="Download Image"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -333,16 +391,12 @@ export default function ContentGenerationTab() {
                 1. Brand Context
               </label>
               <div className="relative">
-                {/* 3. UPDATED SELECT LOGIC 
-                  Uses ID as value, but updates Name state for AI prompt
-                */}
                 <select
                   className="w-full pl-3 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none"
                   value={selectedBrandId}
                   onChange={(e) => {
                     const newId = e.target.value;
                     setSelectedBrandId(newId);
-                    // Find the name that matches this ID so we can send it to the AI
                     const brand = BRAND_OPTIONS.find((b) => b.id === newId);
                     if (brand) setBrandName(brand.name);
                   }}
@@ -452,6 +506,117 @@ export default function ContentGenerationTab() {
             </button>
           )}
         </>
+      )}
+
+      {/* --- TOAST NOTIFICATION --- */}
+
+      {toast && (
+        <div className="absolute bottom-15 inset-x-4 z-[100] animate-in slide-in-from-bottom-4 fade-in duration-300 flex justify-center pointer-events-none">
+          <div
+            className={`pointer-events-auto max-w-xl w-full px-5 py-4 flex items-center justify-between rounded-xl shadow-2xl border ${
+              toast.type === "error"
+                ? "bg-red-100 border-red-300 text-red-900" 
+                : "bg-blue-100 border-green-300 text-green-900" 
+            } backdrop-blur-md`}
+          >
+            <div className="flex items-center gap-3">
+              {toast.type === "error" ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-5 h-5 flex-shrink-0 text-red-700"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-5 h-5 flex-shrink-0 text-blue-700"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+                  />
+                </svg>
+              )}
+              <span className="text-sm font-bold tracking-tight">
+                {toast.message}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setToast(null)}
+              className={`p-1.5 rounded-full transition-all active:scale-95 ${
+                toast.type === "error"
+                  ? "hover:bg-red-200 text-red-800"
+                  : "hover:bg-blue-200 text-blue-800"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2.5}
+                stroke="currentColor"
+                className="w-4 h-4"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18 18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      {/* --- FULL SCREEN PREVIEW MODAL --- */}
+      {isPreviewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4"
+          onClick={() => setIsPreviewOpen(false)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setIsPreviewOpen(false)}
+            className="absolute top-6 right-6 p-1 text-white/70 hover:text-white bg-white/10 hover:bg-red-400/50 rounded-lg  transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          {/* Large Image */}
+          <img
+            src={generatedImage!}
+            alt="Full Preview"
+            className="max-w-full max-h-full object-contain rounded shadow-2xl scale-in-95 animate-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
