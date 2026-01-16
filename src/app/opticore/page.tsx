@@ -9,9 +9,9 @@ import { useMarketplaceClient } from "@/src/utils/hooks/useMarketplaceClient";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TabsContent } from "@radix-ui/react-tabs";
 import { SeoAnalysisTab } from "@/src/components/seo-analysis-tab";
-import { BrokenLinkDetectionTab } from "@/src/components/broken-link-detection-tab";
-import { BrandComplianceTab } from "@/src/components/brand-compliance-tab";
 import ContentGenerationTab from "@/src/components/content-generation-tab";
+import BrokenLinkDetectionTab from "@/src/components/broken-link-detection-tab";
+import BrandComplianceTab from "@/src/components/brand-compliance-tab";
 
 function PagesContextPanel() {
   const { client, error, isInitialized } = useMarketplaceClient();
@@ -68,10 +68,10 @@ function PagesContextPanel() {
               <SeoAnalysisTab />
             </TabsContent>
             <TabsContent value="links">
-              <BrokenLinkDetectionTab />
+              <BrokenLinkDetectionTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="compliance">
-              <BrandComplianceTab />
+              <BrandComplianceTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="generation">
               <ContentGenerationTab />
