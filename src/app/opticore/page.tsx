@@ -54,8 +54,7 @@ function PagesContextPanel() {
         detection, brand compliance checking, and intelligent content
         generation.
       </p>
-      {/* {isInitialized && pagesContext ? ( */}
-      {true ? (
+      {isInitialized && pagesContext ? (
         <div className="mt-8">
           <Tabs defaultValue="seo">
             <TabsList className="grid w-full grid-cols-2 h-auto mb-4 md:inline-flex md:w-auto md:h-9 mx-auto">
