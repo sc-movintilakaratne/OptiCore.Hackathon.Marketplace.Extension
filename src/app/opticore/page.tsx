@@ -64,7 +64,7 @@ function PagesContextPanel() {
               <TabsTrigger value="generation">Content Hub Bridge</TabsTrigger>
             </TabsList>
             <TabsContent value="seo">
-              <SeoAnalysisTab />
+              <SeoAnalysisTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="links">
               <BrokenLinkDetectionTab pageInfo={pagesContext} client={client} />

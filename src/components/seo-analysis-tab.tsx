@@ -1,861 +1,750 @@
+import { ClientSDK, PagesContext } from "@sitecore-marketplace-sdk/client";
 import { useEffect, useState } from "react";
-import { getPageContent } from "../api/sitecore/getPageContent";
-import { getAuthToken } from "../api/sitecore/getAuthToken";
-import { getAllPagesBySite } from "../api/sitecore/getAllPagesBySite";
-import { getCollections } from "../api/sitecore/getCollections";
-import { getSites } from "../api/sitecore/getSites";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  Search,
+  Zap,
+  Sparkles,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  Circle,
+  FileText,
+} from "lucide-react";
 import { getPageStructure } from "../api/sitecore/getPageStructure";
-import { getSeoScore, SeoScoreResponse } from "../api/seo/getSeoScore";
 import { analyzeHeadSeo, HeadSeoScoreResponse } from "../api/seo/getHeadSeoScore";
 import { fakeToken } from "../utils/utilities/token";
+import { GoogleGenAI } from "@google/genai";
 
-interface Collection {
-  id: string;
-  name: string;
-  [key: string]: any;
+interface SeoMetric {
+  key: string;
+  label: string;
+  score: number;
+  maxScore: number;
+  message: string;
+  status: "PASS" | "WARNING" | "FAIL";
 }
 
-interface Site {
-  id?: string;
-  name: string;
-  [key: string]: any;
+interface SeoMetricCardProps {
+  metric: SeoMetric;
+  fieldValue: string;
+  onFieldChange: (value: string) => void;
+  onSuggest: () => void;
+  isSuggesting: boolean;
+  aiSuggestion?: string;
 }
 
-interface Page {
-  id: string;
-  path?: string;
-  [key: string]: any;
-}
-
-export function SeoAnalysisTab() {
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [selectedCollection, setSelectedCollection] = useState<string>("");
-  const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSite, setSelectedSite] = useState<string>("");
-  const [pages, setPages] = useState<Page[]>([]);
-  const [pageContent, setPageContent] = useState<any>({});
-  const [token, setToken] = useState<string | undefined>(undefined);
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [seoScores, setSeoScores] = useState<Record<string, SeoScoreResponse>>({});
-  const [analyzingPages, setAnalyzingPages] = useState<Record<string, boolean>>({});
-  const [analyzingHeadSeo, setAnalyzingHeadSeo] = useState<Record<string, boolean>>({});
-  const [selectedPageForReport, setSelectedPageForReport] = useState<Page | null>(null);
-  const [selectedPageForHeadSeo, setSelectedPageForHeadSeo] = useState<Page | null>(null);
-  const [headSeoScores, setHeadSeoScores] = useState<Record<string, HeadSeoScoreResponse>>({});
-  const [expandedHeadSeoItems, setExpandedHeadSeoItems] = useState<Record<string, Set<string>>>({});
-  const [expandedSeoItems, setExpandedSeoItems] = useState<Record<string, Set<string>>>({});
-  const [loading, setLoading] = useState({
-    collections: false,
-    sites: false,
-    pages: false,
-  });
-  const [error, setError] = useState<string | null>(null);
-
-  const handleAnalyzePage = async (page: Page) => {
-    try {
-      // Set analyzing state
-      setAnalyzingPages((prev) => ({ ...prev, [page.id]: true }));
-      setError(null);
-
-      // Get page HTML content
-      const pageData = await getPageStructure({
-        token: fakeToken,
-        pageId: page.id
-      });
-
-      if (!pageData?.html) {
-        throw new Error("Failed to retrieve page HTML content");
-      }
-
-      // Get SEO score from external API
-      const seoScore = await getSeoScore({
-        html: pageData.html,
-        url: page.path,
-      });
-
-      // Store the SEO score
-      setSeoScores((prev) => ({
-        ...prev,
-        [page.id]: seoScore,
-      }));
-
-      // Set the page for report display
-      setSelectedPageForReport(page);
-    } catch (err) {
-      console.error("Error analyzing page:", err);
-      setError(`Failed to analyze page: ${err instanceof Error ? err.message : "Unknown error"}`);
-    } finally {
-      // Clear analyzing state
-      setAnalyzingPages((prev) => {
-        const newState = { ...prev };
-        delete newState[page.id];
-        return newState;
-      });
+const SeoMetricCard: React.FC<SeoMetricCardProps> = ({
+  metric,
+  fieldValue,
+  onFieldChange,
+  onSuggest,
+  isSuggesting,
+  aiSuggestion,
+}) => {
+  const getStatusColor = () => {
+    switch (metric.status) {
+      case "PASS":
+        return "bg-emerald-50 border-emerald-200 text-emerald-800";
+      case "WARNING":
+        return "bg-amber-50 border-amber-200 text-amber-800";
+      case "FAIL":
+        return "bg-rose-50 border-rose-200 text-rose-800";
     }
   };
 
-  const handleAnalyzeHeadSeo = async (page: Page) => {
-    try {
-      // Set analyzing state
-      setAnalyzingHeadSeo((prev) => ({ ...prev, [page.id]: true }));
-      setError(null);
-
-      // Get page HTML content
-      const pageData = await getPageStructure({
-        token: fakeToken,
-        pageId: page.id
-      });
-
-      if (!pageData?.html) {
-        throw new Error("Failed to retrieve page HTML content");
-      }
-
-      // Analyze head SEO elements
-      const headSeoResults = analyzeHeadSeo(pageData.html);
-
-      // Store the head SEO results
-      setHeadSeoScores((prev) => ({
-        ...prev,
-        [page.id]: headSeoResults,
-      }));
-
-      // Set the page for head SEO report display
-      setSelectedPageForHeadSeo(page);
-    } catch (err) {
-      console.error("Error analyzing head SEO:", err);
-      setError(`Failed to analyze head SEO: ${err instanceof Error ? err.message : "Unknown error"}`);
-    } finally {
-      // Clear analyzing state
-      setAnalyzingHeadSeo((prev) => {
-        const newState = { ...prev };
-        delete newState[page.id];
-        return newState;
-      });
+  const getStatusIcon = () => {
+    switch (metric.status) {
+      case "PASS":
+        return <CheckCircle className="w-5 h-5 text-emerald-600" />;
+      case "WARNING":
+        return <AlertTriangle className="w-5 h-5 text-amber-600" />;
+      case "FAIL":
+        return <AlertCircle className="w-5 h-5 text-rose-600" />;
     }
   };
 
-  const fetchCollections = async () => {
-    try {
-      setLoading((prev) => ({ ...prev, collections: true }));
-      setError(null);
-      const data = await getCollections({ token: fakeToken });
-
-      // Handle different response structures
-      let collectionsData: Collection[] = [];
-      if (Array.isArray(data)) {
-        collectionsData = data;
-      } else if (data?.items) {
-        collectionsData = data.items;
-      } else if (data?.data) {
-        collectionsData = Array.isArray(data.data) ? data.data : [];
-      }
-
-      setCollections(collectionsData);
-    } catch (err) {
-      console.error("Error fetching collections:", err);
-      setError("Failed to load collections");
-    } finally {
-      setLoading((prev) => ({ ...prev, collections: false }));
+  const getStatusBadge = () => {
+    switch (metric.status) {
+      case "PASS":
+        return "bg-emerald-100 text-emerald-700";
+      case "WARNING":
+        return "bg-amber-100 text-amber-700";
+      case "FAIL":
+        return "bg-rose-100 text-rose-700";
     }
   };
 
-  const fetchSites = async () => {
-    try {
-      setLoading((prev) => ({ ...prev, sites: true }));
-      setError(null);
-      setSelectedSite(""); // Reset site selection
-      setPages([]); // Clear pages when collection changes
-
-      const data = await getSites({
-        token: fakeToken,
-        collectionId: selectedCollection
-      });
-
-      // Handle different response structures
-      let sitesData: Site[] = [];
-      if (Array.isArray(data)) {
-        sitesData = data;
-      } else if (data?.items) {
-        sitesData = data.items;
-      } else if (data?.data) {
-        sitesData = Array.isArray(data.data) ? data.data : [];
-      }
-
-      setSites(sitesData);
-    } catch (err) {
-      console.error("Error fetching sites:", err);
-      setError("Failed to load sites for selected collection");
-    } finally {
-      setLoading((prev) => ({ ...prev, sites: false }));
-    }
-  };
-
-  const fetchPages = async () => {
-      try {
-        setLoading((prev) => ({ ...prev, pages: true }));
-        setError(null);
-
-        const data = await getAllPagesBySite({
-          token: fakeToken,
-          siteName: selectedSite,
-        });
-
-        // Handle different response structures
-        let pagesData: Page[] = [];
-        if (Array.isArray(data)) {
-          pagesData = data;
-        } else if (data?.items) {
-          pagesData = data.items;
-        } else if (data?.data) {
-          pagesData = Array.isArray(data.data) ? data.data : [];
-        }
-
-        setPages(pagesData);
-      } catch (err) {
-        console.error("Error fetching pages:", err);
-        setError("Failed to load pages for selected site");
-      } finally {
-        setLoading((prev) => ({ ...prev, pages: false }));
-      }
-    };
-
-  // Fetch collections on mount
-  useEffect(() => {
-    fetchCollections();
-  }, []);
-
-  // Fetch sites when collection is selected
-  useEffect(() => {
-    if (!selectedCollection) {
-      setSites([]);
-      setSelectedSite("");
-      setPages([]);
-      return;
-    }
-
-    fetchSites();
-  }, [selectedCollection]);
-
-  // Fetch pages when site is selected
-  useEffect(() => {
-    if (!selectedSite) {
-      setPages([]);
-      setSearchQuery(""); // Reset search when site changes
-      setSelectedPageForReport(null); // Clear report when site changes
-      setSelectedPageForHeadSeo(null); // Clear head SEO report when site changes
-      setExpandedHeadSeoItems({}); // Clear expanded state
-      setExpandedSeoItems({}); // Clear expanded state
-      return;
-    }
-
-    fetchPages();
-  }, [selectedSite]);
-
-  // Filter pages based on search query
-  const filteredPages = pages.filter((page) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    const pagePath = (page.path || "").toLowerCase();
-    const pageId = (page.id || "").toLowerCase();
-    return pagePath.includes(query) || pageId.includes(query);
-  });
+  const percentage = Math.round((metric.score / metric.maxScore) * 100);
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold mb-4">SEO Analysis</h3>
-      <p className="text-gray-700 text-sm mb-6">
-        Analyze your content for SEO best practices and get actionable insights
-        to improve your search engine rankings. Select a collection, site, and
-        page to analyze.
-      </p>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-800 text-sm">{error}</p>
+    <div className={`rounded-2xl border-2 p-6 ${getStatusColor()}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {getStatusIcon()}
+          <h4 className="font-bold text-base">{metric.label}</h4>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold">
+            {metric.score}/{metric.maxScore}
+          </span>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusBadge()}`}
+          >
+            {percentage}%
+          </span>
+        </div>
+      </div>
+      <p className="text-sm mb-4 opacity-90">{metric.message}</p>
+      <div className="w-full bg-white/60 rounded-full h-2 mb-4">
+        <div
+          className={`h-2 rounded-full transition-all duration-500 ${
+            metric.status === "PASS"
+              ? "bg-emerald-500"
+              : metric.status === "WARNING"
+              ? "bg-amber-500"
+              : "bg-rose-500"
+          }`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
 
-      <div className="space-y-4">
-        {/* Collections Dropdown */}
-        <div>
-          <label
-            htmlFor="collection-select"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Collection
-          </label>
-          <select
-            id="collection-select"
-            value={selectedCollection}
-            onChange={(e) => setSelectedCollection(e.target.value)}
-            disabled={loading.collections}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            <option value="">Select a collection...</option>
-            {collections.map((collection) => (
-              <option key={collection.id} value={collection.id}>
-                {collection.name || collection.id}
-              </option>
-            ))}
-          </select>
-          {loading.collections && (
-            <p className="text-xs text-gray-500 mt-1">Loading collections...</p>
+      {/* Text Field and Suggest Button for WARNING/FAIL metrics */}
+      {(metric.status === "WARNING" || metric.status === "FAIL") && (
+        <div className="space-y-3 mt-4 pt-4 border-t border-white/40">
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-slate-700">
+              {metric.label}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={fieldValue}
+                onChange={(e) => onFieldChange(e.target.value)}
+                placeholder={`Enter ${metric.label.toLowerCase()}...`}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+              <button
+                onClick={onSuggest}
+                disabled={isSuggesting}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-2"
+              >
+                {isSuggesting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Suggest
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* AI Generated Suggestion Display */}
+          {aiSuggestion && (
+            <div className="mt-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <p className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                  AI Suggestion
+                </p>
+              </div>
+              <p className="text-sm text-indigo-900 font-medium">{aiSuggestion}</p>
+            </div>
           )}
         </div>
+      )}
+    </div>
+  );
+};
 
-        {/* Sites List */}
-        {selectedCollection && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sites ({sites.length})
-            </label>
-            {loading.sites ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                <span>Loading sites...</span>
-              </div>
-            ) : sites.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                <p className="text-gray-600 text-sm">
-                  No sites found for this collection
-                </p>
-              </div>
-            ) : (
-              <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {sites.map((site) => {
-                    const siteId = site.id || site.name;
-                    const isSelected = selectedSite === (site.name || site.id);
-                    return (
-                      <li
-                        key={siteId}
-                        onClick={() => setSelectedSite(site.name || site.id || "")}
-                        className={`px-4 py-3 cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-blue-50 border-l-4 border-l-blue-500"
-                            : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">
-                            {site.name || site.id}
-                          </span>
-                          {site.id && site.id !== site.name && (
-                            <span className="text-xs text-gray-500 mt-1">
-                              ID: {site.id}
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+export function SeoAnalysisTab({
+  pageInfo,
+  client,
+}: {
+  pageInfo?: PagesContext;
+  client: ClientSDK | null;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [seoResult, setSeoResult] = useState<HeadSeoScoreResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({});
+  const [suggestingFields, setSuggestingFields] = useState<Record<string, boolean>>({});
+
+  console.log(pageInfo?.pageInfo?.id);
+
+  const handleSeoAnalysis = async () => {
+    if (!pageInfo?.pageInfo?.id) {
+      setError("No page selected");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSeoResult(null);
+
+    try {
+      // Get page HTML content from Sitecore
+      const pageData = await getPageStructure({
+        token: fakeToken,
+        pageId: pageInfo?.pageInfo?.id,
+      });
+
+      // console.log(pageData);
+
+      if (!pageData?.html) {
+        throw new Error("Failed to retrieve page HTML content");
+      }
+
+      // Analyze Head SEO using the HTML content
+      const headSeoScore = analyzeHeadSeo(pageData.html);
+
+      setSeoResult(headSeoScore);
+    } catch (err) {
+      console.error("Error analyzing SEO:", err);
+      setError(
+        `Failed to analyze SEO: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Convert Head SEO results to metrics with status
+  const getMetrics = (): SeoMetric[] => {
+    if (!seoResult) return [];
+
+    const metrics: SeoMetric[] = [];
+
+    const metricConfigs = [
+      { key: "title", label: "Title Tag", maxScore: 100 },
+      { key: "metaDescription", label: "Meta Description", maxScore: 100 },
+      { key: "metaKeywords", label: "Meta Keywords", maxScore: 100 },
+      { key: "ogTitle", label: "OG Title", maxScore: 100 },
+      { key: "ogDescription", label: "OG Description", maxScore: 100 },
+      { key: "ogImage", label: "OG Image", maxScore: 100 },
+      { key: "ogUrl", label: "OG URL", maxScore: 100 },
+    ];
+
+    metricConfigs.forEach((config) => {
+      const element = seoResult[config.key as keyof HeadSeoScoreResponse];
+      if (element) {
+        const percentage = element.score;
+        let status: "PASS" | "WARNING" | "FAIL";
+        if (percentage >= 80) {
+          status = "PASS";
+        } else if (percentage >= 50) {
+          status = "WARNING";
+        } else {
+          status = "FAIL";
+        }
+
+        metrics.push({
+          key: config.key,
+          label: config.label,
+          score: element.score,
+          maxScore: config.maxScore,
+          message: element.message || "",
+          status,
+        });
+      }
+    });
+
+    return metrics;
+  };
+
+  // Calculate overall score from head SEO elements
+  const calculateOverallScore = (): number => {
+    if (!seoResult) return 0;
+    
+    const scores = [
+      seoResult.title.score,
+      seoResult.metaDescription.score,
+      seoResult.metaKeywords.score,
+      seoResult.ogTitle.score,
+      seoResult.ogDescription.score,
+      seoResult.ogImage.score,
+      seoResult.ogUrl.score,
+    ];
+    
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+
+  // Generate recommendations based on head SEO results
+  const getRecommendations = (): string[] => {
+    if (!seoResult) return [];
+    
+    const recommendations: string[] = [];
+    
+    if (seoResult.title.score < 100) {
+      recommendations.push(seoResult.title.message);
+    }
+    if (seoResult.metaDescription.score < 100) {
+      recommendations.push(seoResult.metaDescription.message);
+    }
+    if (seoResult.metaKeywords.score < 100) {
+      recommendations.push(seoResult.metaKeywords.message);
+    }
+    if (seoResult.ogTitle.score < 100) {
+      recommendations.push(seoResult.ogTitle.message);
+    }
+    if (seoResult.ogDescription.score < 100) {
+      recommendations.push(seoResult.ogDescription.message);
+    }
+    if (seoResult.ogImage.score < 100) {
+      recommendations.push(seoResult.ogImage.message);
+    }
+    if (seoResult.ogUrl.score < 100) {
+      recommendations.push(seoResult.ogUrl.message);
+    }
+    
+    return recommendations;
+  };
+
+  // Function to call Google AI for SEO suggestions
+  const callExternalAI = async (
+    fieldKey: string,
+    fieldLabel: string,
+    currentValue: string,
+    message: string
+  ): Promise<string> => {
+    try {
+      const ai = new GoogleGenAI({
+        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || "",
+      });
+
+      // Build context-aware prompt based on field type
+      let prompt = `You are an SEO expert. Generate an optimized ${fieldLabel} for a webpage.
+
+Current Issue: ${message}
+${currentValue ? `Current Value: ${currentValue}` : "No current value exists"}
+
+Field Type: ${fieldKey}
+Field Label: ${fieldLabel}
+
+Requirements:`;
+
+      // Add specific requirements based on field type
+      switch (fieldKey) {
+        case "title":
+          prompt += `
+- Must be 50-60 characters long
+- Include primary keyword naturally
+- Be compelling and click-worthy
+- Accurately describe the page content`;
+          break;
+        case "metaDescription":
+          prompt += `
+- Must be 150-160 characters long
+- Include primary keyword and call-to-action
+- Be compelling and encourage clicks
+- Summarize the page content accurately`;
+          break;
+        case "metaKeywords":
+          prompt += `
+- Provide 5-10 relevant keywords separated by commas
+- Include primary and secondary keywords
+- Use natural keyword variations`;
+          break;
+        case "ogTitle":
+          prompt += `
+- Must be 60 characters or less
+- Optimized for social media sharing
+- Engaging and shareable`;
+          break;
+        case "ogDescription":
+          prompt += `
+- Must be 200 characters or less
+- Compelling social media preview text
+- Encourages engagement and sharing`;
+          break;
+        case "ogImage":
+          prompt += `
+- Provide a relevant image URL or description
+- Image should be 1200x630 pixels (recommended)
+- Should represent the page content visually`;
+          break;
+        case "ogUrl":
+          prompt += `
+- Provide the canonical URL for this page
+- Should be the full absolute URL
+- Must be the primary URL for this content`;
+          break;
+        default:
+          prompt += `
+- Optimize for SEO best practices
+- Be relevant and accurate`;
+      }
+
+      prompt += `
+
+Generate only the optimized ${fieldLabel} value. Do not include explanations or additional text.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash-exp",
+        contents: prompt,
+        config: {
+          temperature: 0.7,
+          maxOutputTokens: 200,
+        },
+      });
+
+      const suggestion = response.text?.trim() || "";
+      
+      if (!suggestion) {
+        throw new Error("AI did not generate a suggestion");
+      }
+
+      return suggestion;
+    } catch (error) {
+      console.error("Error calling Google AI:", error);
+      // Fallback to a basic suggestion if AI fails
+      return `Optimized ${fieldLabel} based on SEO best practices. ${message}`;
+    }
+  };
+
+  const handleFieldChange = (fieldKey: string, value: string) => {
+    setFieldValues((prev) => ({
+      ...prev,
+      [fieldKey]: value,
+    }));
+  };
+
+  const handleSuggest = async (fieldKey: string, fieldLabel: string, message: string) => {
+    setSuggestingFields((prev) => ({
+      ...prev,
+      [fieldKey]: true,
+    }));
+
+    try {
+      const currentValue = fieldValues[fieldKey] || "";
+      const suggestion = await callExternalAI(fieldKey, fieldLabel, currentValue, message);
+      
+      setAiSuggestions((prev) => ({
+        ...prev,
+        [fieldKey]: suggestion,
+      }));
+    } catch (err) {
+      console.error("Error generating AI suggestion:", err);
+      setError(`Failed to generate suggestion: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSuggestingFields((prev) => {
+        const newState = { ...prev };
+        delete newState[fieldKey];
+        return newState;
+      });
+    }
+  };
+
+  const metrics = getMetrics();
+  const overallScore = calculateOverallScore();
+  const recommendations = getRecommendations();
+  const chartData = metrics.map((metric) => ({
+    name: metric.label,
+    value: metric.score,
+  }));
+
+  const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "#10b981";
+    if (score >= 60) return "#f59e0b";
+    return "#ef4444";
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <main className="max-w-7xl mx-auto p-8">
+        <div className="space-y-8">
+          {/* Action Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSeoAnalysis}
+              disabled={loading || !pageInfo?.pageInfo?.id}
+              className={`px-6 py-4 rounded-2xl font-bold text-white transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${
+                loading || !pageInfo?.pageInfo?.id
+                  ? "bg-slate-300 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Analyzing SEO...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" />
+                  Run SEO Analysis
+                </>
+              )}
+            </button>
           </div>
-        )}
 
-        {/* Pages List */}
-        {selectedSite && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Pages ({pages.length})
-              </label>
-              {!loading.pages && pages.length > 0 && (
-                <span className="text-xs text-gray-500">
-                  {filteredPages.length} {filteredPages.length === 1 ? 'result' : 'results'}
-                </span>
+          {/* Results Section */}
+          {!seoResult && !loading && !error && (
+            <div className="h-full min-h-[600px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-white p-12 text-center group">
+              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                <Search className="w-12 h-12 text-slate-200" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                SEO Analysis Ready
+              </h3>
+              <p className="max-w-md text-slate-500">
+                Click the button above to analyze the current page's SEO
+                performance. The analysis will fetch the live HTML content from
+                Sitecore and evaluate SEO best practices.
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-rose-50 border-2 border-rose-200 rounded-3xl p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-bold text-rose-800">Error</h3>
+              </div>
+              <p className="text-sm text-rose-700">{error}</p>
+            </div>
+          )}
+
+          {loading && (
+            <div className="h-full min-h-[600px] flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+              <div className="relative mb-8">
+                <div className="w-24 h-24 border-4 border-indigo-100 rounded-full animate-spin border-t-indigo-600"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Search className="w-8 h-8 text-indigo-600 animate-pulse" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-slate-800 mb-2">
+                Analyzing SEO
+              </p>
+              <p className="text-slate-400 text-sm animate-pulse">
+                Fetching page content and evaluating SEO metrics...
+              </p>
+            </div>
+          )}
+
+          {seoResult && !loading && (
+            <div className="space-y-6">
+              {/* Page Details Section */}
+              {pageInfo?.pageInfo && (
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                      Page Details
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Page Name
+                      </p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {pageInfo.pageInfo.name || "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Page ID
+                      </p>
+                      <p className="text-sm font-mono text-slate-600 break-all">
+                        {pageInfo.pageInfo.id || "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Path
+                      </p>
+                      <p className="text-sm font-medium text-slate-700 break-all">
+                        {pageInfo.pageInfo.path || "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Language
+                      </p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {pageInfo.pageInfo.language || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                {/* Score Widget */}
+                <div className="md:col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <CheckCircle className="w-24 h-24" />
+                  </div>
+                  <div className="relative w-32 h-32 flex items-center justify-center mb-4">
+                    <svg className="absolute w-full h-full transform -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        fill="transparent"
+                        stroke="#f1f5f9"
+                        strokeWidth="12"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        fill="transparent"
+                        stroke={getScoreColor(overallScore)}
+                        strokeWidth="12"
+                        strokeDasharray={351.8}
+                        strokeDashoffset={
+                          351.8 - (351.8 * overallScore) / 100
+                        }
+                        strokeLinecap="round"
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="text-center">
+                      <span className="text-4xl font-black text-slate-800 tracking-tighter">
+                        {overallScore}%
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    SEO Score
+                  </p>
+                </div>
+
+                {/* Metrics Bar Chart */}
+                <div className="md:col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase mb-8 tracking-[0.2em]">
+                    Metrics Breakdown
+                  </h4>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} layout="vertical">
+                        <XAxis type="number" hide domain={[0, 100]} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={100}
+                          tick={{
+                            fontSize: 9,
+                            fontWeight: 800,
+                            fill: "#64748b",
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "#f8fafc" }}
+                          contentStyle={{
+                            borderRadius: "16px",
+                            border: "none",
+                            boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
+                            fontWeight: "bold",
+                          }}
+                        />
+                        <Bar
+                          dataKey="value"
+                          radius={[0, 10, 10, 0]}
+                          barSize={20}
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Card */}
+              {recommendations.length > 0 && (
+                <div className="bg-indigo-600 p-8 rounded-[2rem] shadow-2xl shadow-indigo-200 text-white relative overflow-hidden">
+                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-indigo-100">
+                      SEO Recommendations
+                    </h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {recommendations.map((rec, idx) => (
+                      <li key={idx} className="text-base font-medium leading-relaxed flex items-start gap-2">
+                        <span className="text-indigo-200 mt-1">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Metrics Cards */}
+              {metrics.length > 0 && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center px-2">
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                      SEO Metrics
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full">
+                        <Circle className="w-1.5 h-1.5 fill-current" />
+                        {metrics.filter((m) => m.status === "FAIL").length}{" "}
+                        Critical
+                      </span>
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
+                        <Circle className="w-1.5 h-1.5 fill-current" />
+                        {metrics.filter((m) => m.status === "WARNING").length}{" "}
+                        Warnings
+                      </span>
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                        <Circle className="w-1.5 h-1.5 fill-current" />
+                        {metrics.filter((m) => m.status === "PASS").length}{" "}
+                        Passed
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-4">
+                    {metrics.map((metric) => (
+                      <SeoMetricCard
+                        key={metric.key}
+                        metric={metric}
+                        fieldValue={fieldValues[metric.key] || ""}
+                        onFieldChange={(value) => handleFieldChange(metric.key, value)}
+                        onSuggest={() => handleSuggest(metric.key, metric.label, metric.message)}
+                        isSuggesting={suggestingFields[metric.key] || false}
+                        aiSuggestion={aiSuggestions[metric.key]}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            {loading.pages ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                <span>Loading pages...</span>
-              </div>
-            ) : pages.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                <p className="text-gray-600 text-sm">
-                  No pages found for this site
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Search Bar */}
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    placeholder="Search pages by path or ID..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  />
-                </div>
-                {filteredPages.length === 0 ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                    <p className="text-gray-600 text-sm">
-                      No pages found matching "{searchQuery}"
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                    <ul className="divide-y divide-gray-200">
-                      {filteredPages.map((page) => {
-                        const isAnalyzing = analyzingPages[page.id];
-                        return (
-                          <li
-                            key={page.id}
-                            className="px-4 py-3 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-col flex-1">
-                                <span className="font-medium text-sm">
-                                  {page.path || page.id}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-1">
-                                  ID: {page.id}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 ml-4">
-                                <button
-                                  onClick={() => handleAnalyzeHeadSeo(page)}
-                                  disabled={analyzingHeadSeo[page.id]}
-                                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                  {analyzingHeadSeo[page.id] ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      <span>Analyzing...</span>
-                                    </>
-                                  ) : (
-                                    "Analyze Head SEO"
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => handleAnalyzePage(page)}
-                                  disabled={isAnalyzing}
-                                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                  {isAnalyzing ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      <span>Analyzing...</span>
-                                    </>
-                                  ) : (
-                                    "Analyze Full Page"
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Head SEO Report Section */}
-        {selectedPageForHeadSeo && headSeoScores[selectedPageForHeadSeo.id] && (
-          <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h4 className="text-lg font-semibold text-gray-900">Head SEO</h4>
-              <button
-                onClick={() => setSelectedPageForHeadSeo(null)}
-                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="p-6">
-              {/* Page Info */}
-              <div className="mb-6 pb-4 border-b border-gray-200">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Page:</span> {selectedPageForHeadSeo.path || selectedPageForHeadSeo.id}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  <span className="font-medium">ID:</span> {selectedPageForHeadSeo.id}
-                </p>
-              </div>
-
-              {(() => {
-                const headSeo = headSeoScores[selectedPageForHeadSeo.id];
-                
-                // Calculate average score
-                const scores = [
-                  headSeo.title.score,
-                  headSeo.metaDescription.score,
-                  headSeo.metaKeywords.score,
-                  headSeo.ogTitle.score,
-                  headSeo.ogDescription.score,
-                  headSeo.ogImage.score,
-                  headSeo.ogUrl.score,
-                ];
-                const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-
-                const getScoreColor = (score: number) => {
-                  if (score >= 90) return { bg: "bg-green-500", text: "text-green-600", border: "border-green-200", bgLight: "bg-green-50" };
-                  if (score >= 50) return { bg: "bg-orange-500", text: "text-orange-600", border: "border-orange-200", bgLight: "bg-orange-50" };
-                  return { bg: "bg-red-500", text: "text-red-600", border: "border-red-200", bgLight: "bg-red-50" };
-                };
-
-                const scoreColor = getScoreColor(avgScore);
-                const circumference = 2 * Math.PI * 45; // radius = 45
-                const offset = circumference - (avgScore / 100) * circumference;
-
-                const headSeoItems = [
-                  { key: 'title', label: 'Title', data: headSeo.title },
-                  { key: 'metaDescription', label: 'Meta Description', data: headSeo.metaDescription },
-                  { key: 'metaKeywords', label: 'Meta Keywords', data: headSeo.metaKeywords },
-                  { key: 'ogTitle', label: 'OG Title', data: headSeo.ogTitle },
-                  { key: 'ogDescription', label: 'OG Description', data: headSeo.ogDescription },
-                  { key: 'ogImage', label: 'OG Image', data: headSeo.ogImage },
-                  { key: 'ogUrl', label: 'OG URL', data: headSeo.ogUrl },
-                ];
-
-                return (
-                  <>
-                    {/* Score Gauge */}
-                    <div className="flex justify-center mb-8">
-                      <div className="relative w-32 h-32">
-                        <svg className="transform -rotate-90 w-32 h-32">
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="45"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            fill="none"
-                            className="text-gray-200"
-                          />
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="45"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            fill="none"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            strokeLinecap="round"
-                            className={`${scoreColor.bg} transition-all duration-500`}
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className={`text-3xl font-bold ${scoreColor.text}`}>{avgScore}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Metrics List */}
-                    <div className="space-y-2">
-                      {headSeoItems.map((item) => {
-                        const itemColor = getScoreColor(item.data.score);
-                        const itemCircumference = 2 * Math.PI * 12;
-                        const itemOffset = itemCircumference - (item.data.score / 100) * itemCircumference;
-                        const expandedSet = expandedHeadSeoItems[selectedPageForHeadSeo.id] || new Set();
-                        const isExpanded = expandedSet.has(item.key);
-
-                        const toggleExpanded = () => {
-                          setExpandedHeadSeoItems(prev => {
-                            const pageId = selectedPageForHeadSeo.id;
-                            const currentSet = prev[pageId] || new Set();
-                            const newSet = new Set(currentSet);
-                            if (isExpanded) {
-                              newSet.delete(item.key);
-                            } else {
-                              newSet.add(item.key);
-                            }
-                            return { ...prev, [pageId]: newSet };
-                          });
-                        };
-
-                        return (
-                          <div
-                            key={item.key}
-                            className={`border rounded-lg ${itemColor.border} ${itemColor.bgLight} transition-colors`}
-                          >
-                            <button
-                              onClick={toggleExpanded}
-                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors"
-                            >
-                              <div className="flex items-center gap-3 flex-1">
-                                <div className="relative w-8 h-8 flex-shrink-0">
-                                  <svg className="transform -rotate-90 w-8 h-8">
-                                    <circle
-                                      cx="16"
-                                      cy="16"
-                                      r="12"
-                                      stroke="currentColor"
-                                      strokeWidth="3"
-                                      fill="none"
-                                      className="text-gray-200"
-                                    />
-                                    <circle
-                                      cx="16"
-                                      cy="16"
-                                      r="12"
-                                      stroke="currentColor"
-                                      strokeWidth="3"
-                                      fill="none"
-                                      strokeDasharray={itemCircumference}
-                                      strokeDashoffset={itemOffset}
-                                      strokeLinecap="round"
-                                      className={itemColor.bg}
-                                    />
-                                  </svg>
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className={`text-xs font-bold ${itemColor.text}`}>
-                                      {item.data.score}
-                                    </span>
-                                  </div>
-                                </div>
-                                <span className="text-sm font-medium text-gray-900">{item.label}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className={`text-xs font-semibold ${itemColor.text}`}>
-                                  {item.data.score}/100
-                                </span>
-                                <svg
-                                  className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            </button>
-                            {isExpanded && (
-                              <div className="px-4 pb-4 pt-2 border-t border-gray-200">
-                                <p className="text-xs text-gray-600 mb-3 mt-2">{item.data.message}</p>
-                                {item.data.value && (
-                                  <div className="p-3 bg-white rounded border border-gray-200">
-                                    <p className="text-xs font-medium text-gray-700 mb-1">Value:</p>
-                                    <p className="text-xs text-gray-800 break-words">{item.data.value}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* SEO Report Section */}
-        {selectedPageForReport && seoScores[selectedPageForReport.id] && (
-          <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h4 className="text-lg font-semibold text-gray-900">SEO</h4>
-              <button
-                onClick={() => setSelectedPageForReport(null)}
-                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="p-6">
-              {/* Page Info */}
-              <div className="mb-6 pb-4 border-b border-gray-200">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Page:</span> {selectedPageForReport.path || selectedPageForReport.id}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  <span className="font-medium">ID:</span> {selectedPageForReport.id}
-                </p>
-              </div>
-
-              {(() => {
-                const seoScore = seoScores[selectedPageForReport.id];
-                
-                const getScoreColor = (score: number) => {
-                  if (score >= 90) return { bg: "bg-green-500", text: "text-green-600", border: "border-green-200", bgLight: "bg-green-50" };
-                  if (score >= 50) return { bg: "bg-orange-500", text: "text-orange-600", border: "border-orange-200", bgLight: "bg-orange-50" };
-                  return { bg: "bg-red-500", text: "text-red-600", border: "border-red-200", bgLight: "bg-red-50" };
-                };
-
-                const scoreColor = getScoreColor(seoScore.score);
-                const circumference = 2 * Math.PI * 45; // radius = 45
-                const offset = circumference - (seoScore.score / 100) * circumference;
-
-                const details = seoScore.details || {};
-                const detailItems = [
-                  { key: 'title', label: 'Title Tag', data: details.title, maxScore: 15 },
-                  { key: 'metaDescription', label: 'Meta Description', data: details.metaDescription, maxScore: 15 },
-                  { key: 'headings', label: 'Headings', data: details.headings, maxScore: 20 },
-                  { key: 'images', label: 'Images', data: details.images, maxScore: 15 },
-                  { key: 'links', label: 'Links', data: details.links, maxScore: 10 },
-                  { key: 'content', label: 'Content', data: details.content, maxScore: 15 },
-                ].filter(item => item.data);
-
-                return (
-                  <>
-                    {/* Score Gauge */}
-                    <div className="flex justify-center mb-8">
-                      <div className="relative w-32 h-32">
-                        <svg className="transform -rotate-90 w-32 h-32">
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="45"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            fill="none"
-                            className="text-gray-200"
-                          />
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="45"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            fill="none"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            strokeLinecap="round"
-                            className={`${scoreColor.bg} transition-all duration-500`}
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className={`text-3xl font-bold ${scoreColor.text}`}>{seoScore.score}</div>
-                            {seoScore.grade && (
-                              <div className={`text-sm font-semibold ${scoreColor.text} mt-1`}>{seoScore.grade}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Metrics List */}
-                    {detailItems.length > 0 && (
-                      <div className="space-y-2 mb-6">
-                        {detailItems.map((item) => {
-                          if (!item.data) return null;
-                          const itemScore = Math.round((item.data.score / item.maxScore) * 100);
-                          const itemColor = getScoreColor(itemScore);
-                          const itemCircumference = 2 * Math.PI * 12;
-                          const itemOffset = itemCircumference - (itemScore / 100) * itemCircumference;
-                          const expandedSet = expandedSeoItems[selectedPageForReport.id] || new Set();
-                          const isExpanded = expandedSet.has(item.key);
-
-                          const toggleExpanded = () => {
-                            setExpandedSeoItems(prev => {
-                              const pageId = selectedPageForReport.id;
-                              const currentSet = prev[pageId] || new Set();
-                              const newSet = new Set(currentSet);
-                              if (isExpanded) {
-                                newSet.delete(item.key);
-                              } else {
-                                newSet.add(item.key);
-                              }
-                              return { ...prev, [pageId]: newSet };
-                            });
-                          };
-
-                          return (
-                            <div
-                              key={item.key}
-                              className={`border rounded-lg ${itemColor.border} ${itemColor.bgLight} transition-colors`}
-                            >
-                              <button
-                                onClick={toggleExpanded}
-                                className="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors"
-                              >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <div className="relative w-8 h-8 flex-shrink-0">
-                                    <svg className="transform -rotate-90 w-8 h-8">
-                                      <circle
-                                        cx="16"
-                                        cy="16"
-                                        r="12"
-                                        stroke="currentColor"
-                                        strokeWidth="3"
-                                        fill="none"
-                                        className="text-gray-200"
-                                      />
-                                      <circle
-                                        cx="16"
-                                        cy="16"
-                                        r="12"
-                                        stroke="currentColor"
-                                        strokeWidth="3"
-                                        fill="none"
-                                        strokeDasharray={itemCircumference}
-                                        strokeDashoffset={itemOffset}
-                                        strokeLinecap="round"
-                                        className={itemColor.bg}
-                                      />
-                                    </svg>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <span className={`text-xs font-bold ${itemColor.text}`}>
-                                        {itemScore}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-900">{item.label}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className={`text-xs font-semibold ${itemColor.text}`}>
-                                    {item.data.score}/{item.maxScore}
-                                  </span>
-                                  <svg
-                                    className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </div>
-                              </button>
-                              {isExpanded && (
-                                <div className="px-4 pb-4 pt-2 border-t border-gray-200">
-                                  <p className="text-xs text-gray-600 mt-2">{item.data.message}</p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Recommendations */}
-                    {seoScore.recommendations && seoScore.recommendations.length > 0 && (
-                      <div className="border-t border-gray-200 pt-6">
-                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Opportunities</h5>
-                        <ul className="space-y-2">
-                          {seoScore.recommendations.map((rec, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                              <span className="text-orange-500 mt-1">•</span>
-                              <span>{rec}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
