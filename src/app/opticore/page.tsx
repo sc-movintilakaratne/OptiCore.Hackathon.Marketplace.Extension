@@ -9,7 +9,7 @@ import { useMarketplaceClient } from "@/src/utils/hooks/useMarketplaceClient";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TabsContent } from "@radix-ui/react-tabs";
 import { SeoAnalysisTab } from "@/src/components/seo-analysis-tab";
-import { ContentGenerationTab } from "@/src/components/content-generation-tab";
+import ContentGenerationTab from "@/src/components/content-generation-tab";
 import BrokenLinkDetectionTab from "@/src/components/broken-link-detection-tab";
 import BrandComplianceTab from "@/src/components/brand-compliance-tab";
 
