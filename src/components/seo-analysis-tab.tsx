@@ -32,7 +32,23 @@ interface SeoMetric {
   status: "PASS" | "WARNING" | "FAIL";
 }
 
-const SeoMetricCard: React.FC<{ metric: SeoMetric }> = ({ metric }) => {
+interface SeoMetricCardProps {
+  metric: SeoMetric;
+  fieldValue: string;
+  onFieldChange: (value: string) => void;
+  onSuggest: () => void;
+  isSuggesting: boolean;
+  aiSuggestion?: string;
+}
+
+const SeoMetricCard: React.FC<SeoMetricCardProps> = ({
+  metric,
+  fieldValue,
+  onFieldChange,
+  onSuggest,
+  isSuggesting,
+  aiSuggestion,
+}) => {
   const getStatusColor = () => {
     switch (metric.status) {
       case "PASS":
@@ -87,7 +103,7 @@ const SeoMetricCard: React.FC<{ metric: SeoMetric }> = ({ metric }) => {
         </div>
       </div>
       <p className="text-sm mb-4 opacity-90">{metric.message}</p>
-      <div className="w-full bg-white/60 rounded-full h-2 mb-2">
+      <div className="w-full bg-white/60 rounded-full h-2 mb-4">
         <div
           className={`h-2 rounded-full transition-all duration-500 ${
             metric.status === "PASS"
@@ -99,6 +115,56 @@ const SeoMetricCard: React.FC<{ metric: SeoMetric }> = ({ metric }) => {
           style={{ width: `${percentage}%` }}
         />
       </div>
+
+      {/* Text Field and Suggest Button for WARNING/FAIL metrics */}
+      {(metric.status === "WARNING" || metric.status === "FAIL") && (
+        <div className="space-y-3 mt-4 pt-4 border-t border-white/40">
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-slate-700">
+              {metric.label}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={fieldValue}
+                onChange={(e) => onFieldChange(e.target.value)}
+                placeholder={`Enter ${metric.label.toLowerCase()}...`}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+              <button
+                onClick={onSuggest}
+                disabled={isSuggesting}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-2"
+              >
+                {isSuggesting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Suggest
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* AI Generated Suggestion Display */}
+          {aiSuggestion && (
+            <div className="mt-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <p className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                  AI Suggestion
+                </p>
+              </div>
+              <p className="text-sm text-indigo-900 font-medium">{aiSuggestion}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -113,6 +179,9 @@ export function SeoAnalysisTab({
   const [loading, setLoading] = useState(false);
   const [seoResult, setSeoResult] = useState<HeadSeoScoreResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({});
+  const [suggestingFields, setSuggestingFields] = useState<Record<string, boolean>>({});
 
   console.log(pageInfo?.pageInfo?.id);
 
@@ -242,6 +311,76 @@ export function SeoAnalysisTab({
     }
     
     return recommendations;
+  };
+
+  // Function to call external AI API for suggestions
+  const callExternalAI = async (
+    fieldKey: string,
+    fieldLabel: string,
+    currentValue: string,
+    message: string
+  ): Promise<string> => {
+    // TODO: Replace with actual external AI API call
+    // This is a placeholder function structure
+    
+    const apiUrl = process.env.NEXT_PUBLIC_AI_API_URL || "https://api.example.com/ai/suggest";
+    
+    // Example API call structure (commented out - implement when ready)
+    /*
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_AI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        fieldType: fieldKey,
+        fieldLabel: fieldLabel,
+        currentValue: currentValue,
+        issue: message,
+        context: "SEO optimization",
+      }),
+    });
+    
+    const data = await response.json();
+    return data.suggestion || data.text || "";
+    */
+    
+    // Placeholder: Return a mock suggestion
+    return `AI-generated suggestion for ${fieldLabel} based on: ${message}`;
+  };
+
+  const handleFieldChange = (fieldKey: string, value: string) => {
+    setFieldValues((prev) => ({
+      ...prev,
+      [fieldKey]: value,
+    }));
+  };
+
+  const handleSuggest = async (fieldKey: string, fieldLabel: string, message: string) => {
+    setSuggestingFields((prev) => ({
+      ...prev,
+      [fieldKey]: true,
+    }));
+
+    try {
+      const currentValue = fieldValues[fieldKey] || "";
+      const suggestion = await callExternalAI(fieldKey, fieldLabel, currentValue, message);
+      
+      setAiSuggestions((prev) => ({
+        ...prev,
+        [fieldKey]: suggestion,
+      }));
+    } catch (err) {
+      console.error("Error generating AI suggestion:", err);
+      setError(`Failed to generate suggestion: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSuggestingFields((prev) => {
+        const newState = { ...prev };
+        delete newState[fieldKey];
+        return newState;
+      });
+    }
   };
 
   const metrics = getMetrics();
@@ -523,7 +662,15 @@ export function SeoAnalysisTab({
                   </div>
                   <div className="grid gap-4">
                     {metrics.map((metric) => (
-                      <SeoMetricCard key={metric.key} metric={metric} />
+                      <SeoMetricCard
+                        key={metric.key}
+                        metric={metric}
+                        fieldValue={fieldValues[metric.key] || ""}
+                        onFieldChange={(value) => handleFieldChange(metric.key, value)}
+                        onSuggest={() => handleSuggest(metric.key, metric.label, metric.message)}
+                        isSuggesting={suggestingFields[metric.key] || false}
+                        aiSuggestion={aiSuggestions[metric.key]}
+                      />
                     ))}
                   </div>
                 </div>
