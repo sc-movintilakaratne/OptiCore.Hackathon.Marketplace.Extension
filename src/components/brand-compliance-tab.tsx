@@ -19,6 +19,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { BrandGuidelines } from "../app/api/analyze-brand/route";
+import { getPageStructure } from "../api/sitecore/getPageStructure";
+import { fakeToken } from "../utils/utilities/token";
+import { analyzeBrandCompliance } from "../lib/brand-governance";
+import { ClientSDK, PagesContext } from "@sitecore-marketplace-sdk/client";
 
 interface Issue {
   category: string;
@@ -30,9 +34,9 @@ interface Issue {
 interface BrandAuditResult {
   overallScore: number;
   visualMetrics: {
-    accessibility: number;
-    colorConsistency: number;
-    typography: number;
+    narrativeAlignment: number;
+    structuralIntegrity: number;
+    tonalConsistency: number;
   };
   summary: string;
   issues: Issue[];
@@ -96,74 +100,75 @@ const ComplianceCard: React.FC<{ issue: Issue }> = ({ issue }) => {
   );
 };
 
-export default function BrandComplianceTab() {
+export default function BrandComplianceTab({
+  pageInfo,
+  client,
+}: {
+  pageInfo?: PagesContext;
+  client: ClientSDK | null;
+}) {
   const [guidelines, setGuidelines] = useState<BrandGuidelines>({
-    brandOverview: "sdfsf",
-    missionVisionValues: "dsdsd",
-    brandNarrative: "dsds",
-    colorPalette: ["#4F46E5", "#1E293B"],
-    typographyFonts: ["Inter", "system-ui"],
-    toneOfVoice: "Professional, tech-savvy, and trustworthy.",
-    logoGuidelines:
-      "Logo must have 20px padding and should never be stretched.",
+    brandOverview: `Forma Lux embodies the perfect fusion of modern European design,
+craftsmanship, and minimalism. Our pieces are thoughtfully crafted
+to create harmonious spaces that celebrate both beauty and
+functionality. Each item reflects our commitment to timeless
+elegance while ensuring a seamless integration into contemporary
+living environments.`,
+    missionVisionValues: `We design spaces that promote
+tranquility, encouraging a serene
+atmosphere for relaxation and
+reflection in the hustle of modern
+life.Luxury is not just opulence; it is
+found in the timeless design and
+exceptional craftsmanship that
+creates enduring beauty and
+simplicity in every piece.`,
+    brandNarrative: `Forma Lux was born from a belief that furniture should do more than fill a space—it should illuminate it.
+Guided by a philosophy that design is a form of quiet expression, Forma Lux unites modern minimalism with
+timeless craftsmanship to create pieces that inspire calm, clarity, and connection.
+Each collection is shaped by the interplay of form and light—luxurious yet restrained, sophisticated yet inviting.
+Every curve, texture, and material is chosen not for ornamentation, but for meaning. From the subtle warmth
+of natural wood to the precision of architectural silhouettes, Forma Lux celebrates the beauty of balance and
+the art of thoughtful living.
+Our name, derived from forma (shape) and lux (light), embodies this pursuit: to shape spaces that feel alive
+with intention. Forma Lux exists for those who value authenticity, quality, and the quiet power of design done
+well—a modern ode to living beautifully.`,
+    colorPalette: ["#B89A5B", "#F9F7F4", "#1C1C1C", "#E5E3E1"],
+    typographyFonts: ["DM Sans” Regular"],
+    toneOfVoice: `Forma Lux content reflects the same qualities as its design — elegant, authentic, thoughtful,
+and enduring. Every message should feel as intentional as the craftsmanship behind each
+piece, combining modern minimalism with warmth and humanity.
+We write not to impress, but to express — to illuminate the beauty of quiet design and the art
+of living beautifully.Tone by Context
+Product Descriptions
+Tone: Elegant & precise
+Example: “Crafted with enduring materials and a refined silhouette, the Arca Chair embodies quiet
+sophistication.”
+Marketing Copy
+Tone: Warm & aspirational
+Example: “Forma Lux invites you to rediscover beauty in the everyday — where light, material, and
+form coexist in perfect balance.”
+Editorial & Storytelling
+Tone: Reflective & human
+Example: “Our philosophy begins with intention — designing not for decoration, but for how a
+space feels, functions, and inspires.”
+Social Media
+Tone: Conversational & sincere
+Example: “True luxury isn’t louder — it’s the detail you feel every day.”
+Word Palette
+Preferred (Do):
+Balance, light, form, craftsmanship, harmony, timeless, intentional, serene, refined, enduring.
+Avoid (Don’t):
+Cheap, trendy, bold, flashy, exaggerated, overdesigned.`,
+    logoGuidelines: `The Forma Lux logo reflects the brand’s devotion to modern craftsmanship and timeless elegance. Its
+clean, geometric typography balances strength with refinement—each letter thoughtfully spaced to evoke
+harmony and sophistication. The warm golden hue symbolizes light, artistry, and enduring quality, while
+the minimalist form speaks to simplicity and restraint. Together, these elements embody Forma Lux’s
+philosophy: illuminating everyday living through design that is both functional and beautiful.`,
   });
 
   const [loading, setLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<BrandAuditResult | null>(null);
-
-  // Dummy data
-  const dummyResult: BrandAuditResult = {
-    overallScore: 73,
-    visualMetrics: {
-      accessibility: 85,
-      colorConsistency: 68,
-      typography: 66,
-    },
-    summary:
-      "The page demonstrates strong accessibility practices and maintains proper header hierarchy. However, color consistency issues were detected with unauthorized use of #ff0000 in the CTA button, and typography deviates from brand standards with Comic Sans MS usage. Logo padding requirements are not met.",
-    issues: [
-      {
-        category: "Unauthorized Color Usage",
-        description:
-          "Button element uses #ff0000 which is not part of the approved brand color palette (#4F46E5, #1E293B).",
-        status: "FAIL",
-        recommendation:
-          "Replace button background color with primary brand color #4F46E5 to maintain brand consistency.",
-      },
-      {
-        category: "Non-Compliant Typography",
-        description:
-          "Button text uses 'Comic Sans MS' font family instead of approved 'Inter' or 'system-ui'.",
-        status: "FAIL",
-        recommendation:
-          "Update font-family CSS property to use 'Inter' as the primary typeface for all UI elements.",
-      },
-      {
-        category: "Logo Padding Violation",
-        description:
-          "Logo image does not meet the required 20px padding specification in the header.",
-        status: "WARNING",
-        recommendation:
-          "Add appropriate padding around the logo element to ensure breathing room and brand guideline compliance.",
-      },
-      {
-        category: "Heading Structure",
-        description:
-          "Proper semantic HTML heading tags (h1) are used correctly for page hierarchy.",
-        status: "PASS",
-        recommendation:
-          "Continue using semantic HTML structure for improved accessibility and SEO.",
-      },
-      {
-        category: "Color Contrast",
-        description:
-          "Text color #1E293B on white background meets WCAG AA accessibility standards.",
-        status: "PASS",
-        recommendation:
-          "Maintain current contrast ratios for optimal readability.",
-      },
-    ],
-  };
 
   const updateGuideline = (
     field: keyof BrandGuidelines,
@@ -176,23 +181,34 @@ export default function BrandComplianceTab() {
     setLoading(true);
     setAuditResult(null);
 
-    console.log(guidelines, "gggggggggggggggggg");
+    const pageData = await getPageStructure({
+      token: fakeToken,
+      pageId: pageInfo?.pageInfo?.id || "",
+    });
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const brandMetrics = await analyzeBrandCompliance(
+      pageData.html,
+      guidelines
+    );
 
-    setAuditResult(dummyResult);
+    setAuditResult(brandMetrics);
     setLoading(false);
   };
 
   const chartData = auditResult
     ? [
         {
-          name: "Accessibility",
-          value: auditResult.visualMetrics.accessibility,
+          name: "Narrative Alignment",
+          value: auditResult.visualMetrics.narrativeAlignment,
         },
-        { name: "Colors", value: auditResult.visualMetrics.colorConsistency },
-        { name: "Typography", value: auditResult.visualMetrics.typography },
+        {
+          name: "Structural Integrity",
+          value: auditResult.visualMetrics.structuralIntegrity,
+        },
+        {
+          name: "Tonal Consistency",
+          value: auditResult.visualMetrics.tonalConsistency,
+        },
       ]
     : [];
 
@@ -269,7 +285,7 @@ export default function BrandComplianceTab() {
               </div>
 
               <div className="space-y-4">
-                <div>
+                {/* <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
                     Primary Colors
                   </label>
@@ -284,9 +300,9 @@ export default function BrandComplianceTab() {
                     }
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
-                </div>
+                </div> */}
 
-                <div>
+                {/* <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
                     Font Families
                   </label>
@@ -301,9 +317,9 @@ export default function BrandComplianceTab() {
                     }
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
-                </div>
+                </div> */}
 
-                <div>
+                {/* <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
                     Logo Guidelines
                   </label>
@@ -315,7 +331,7 @@ export default function BrandComplianceTab() {
                     }
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all"
                   />
-                </div>
+                </div> */}
               </div>
 
               <button
@@ -339,22 +355,6 @@ export default function BrandComplianceTab() {
                   </>
                 )}
               </button>
-            </div>
-
-            <div className="bg-slate-900 text-slate-400 p-6 rounded-3xl border border-slate-800">
-              <h4 className="text-[10px] font-black text-slate-500 uppercase mb-4 tracking-widest">
-                Pipeline Status
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span>Pages API Endpoint</span>
-                  <span className="text-emerald-500 font-mono">CONNECTED</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span>Audit Depth</span>
-                  <span className="text-indigo-400">Structural + Copy</span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -385,7 +385,7 @@ export default function BrandComplianceTab() {
                   </div>
                 </div>
                 <p className="text-xl font-bold text-slate-800 mb-2">
-                  Analyzing Visual Integrity
+                  Analyzing
                 </p>
                 <p className="text-slate-400 text-sm animate-pulse">
                   Scanning DOM trees and evaluating brand tone...
@@ -455,7 +455,7 @@ export default function BrandComplianceTab() {
                             dataKey="name"
                             width={100}
                             tick={{
-                              fontSize: 11,
+                              fontSize: 9,
                               fontWeight: 800,
                               fill: "#64748b",
                             }}

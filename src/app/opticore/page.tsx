@@ -68,10 +68,10 @@ function PagesContextPanel() {
               <SeoAnalysisTab />
             </TabsContent>
             <TabsContent value="links">
-              <BrokenLinkDetectionTab />
+              <BrokenLinkDetectionTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="compliance">
-              <BrandComplianceTab />
+              <BrandComplianceTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="generation">
               <ContentGenerationTab />

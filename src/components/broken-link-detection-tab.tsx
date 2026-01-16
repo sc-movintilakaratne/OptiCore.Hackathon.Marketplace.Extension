@@ -7,6 +7,10 @@ import {
   Image,
   Link2,
 } from "lucide-react";
+import { ClientSDK, PagesContext } from "@sitecore-marketplace-sdk/client";
+import { fakeToken } from "../utils/utilities/token";
+import { getPageStructure } from "../api/sitecore/getPageStructure";
+import { validateHtmlContent } from "../lib/check-broken-links";
 
 interface AuditIssue {
   id: string;
@@ -34,7 +38,13 @@ interface AuditResults {
   scanTime: number;
 }
 
-export default function BrokenLinkDetectionTab() {
+export default function BrokenLinkDetectionTab({
+  pageInfo,
+  client,
+}: {
+  pageInfo?: PagesContext;
+  client: ClientSDK | null;
+}) {
   const [results, setResults] = useState<AuditResults | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
@@ -47,16 +57,15 @@ export default function BrokenLinkDetectionTab() {
     setResults(null);
 
     try {
-      const response = await fetch("/api/check-links", {
-        method: "POST",
+      const pageData = await getPageStructure({
+        token: fakeToken,
+        pageId: pageInfo?.pageInfo?.id || "",
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to audit content");
-      }
+      console.log("pageInfo", pageInfo);
 
-      const data = await response.json();
+      const data: any = validateHtmlContent(pageData.html);
+
       setResults(data);
       setLastChecked(new Date());
     } catch (err) {
@@ -89,48 +98,6 @@ export default function BrokenLinkDetectionTab() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <Search className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Sitecore Content Auditor
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            {lastChecked && !isAnalyzing && (
-              <span className="text-sm text-slate-500">
-                Last checked: {lastChecked.toLocaleTimeString()}
-              </span>
-            )}
-            <button
-              onClick={auditContent}
-              disabled={isAnalyzing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                isAnalyzing
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg"
-              }`}
-            >
-              {isAnalyzing ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4" />
-                  Audit Content
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         {/* Error Message */}
         {error && (
@@ -397,6 +364,13 @@ export default function BrokenLinkDetectionTab() {
           </div>
         )}
       </main>
+      <button
+        onClick={auditContent}
+        className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-md hover:shadow-lg transition-all"
+      >
+        <Search className="h-5 w-5" />
+        Start Audit
+      </button>
     </div>
   );
 }
