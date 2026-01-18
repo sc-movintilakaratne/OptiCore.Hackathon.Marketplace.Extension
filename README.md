@@ -91,9 +91,9 @@ There is a file called `.env.example`. You can use that template also. ⚠️ Do
 - You have to generate value for the `NEXT_PUBLIC_TOKEN` variable. For that run this command via bash terminal (include / replace your secrets)
 ```bash
 curl -X POST 'https://auth.sitecorecloud.io/oauth/token' \
-  --header 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode 'client_id=<NEXT_PUBLIC_SITECORE_CLIENT_ID>' \
-  --data-urlencode 'client_secret=<NEXT_PUBLIC_SITECORE_CLIENT_SECRET>' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \ 
+  --data-urlencode 'client_id={YOUR_CLIENT_ID}' \
+  --data-urlencode 'client_secret={YOUR_CLIENT_SECRET}' \
   --data-urlencode 'grant_type=client_credentials' \
   --data-urlencode 'audience=https://api.sitecorecloud.io'
 ```
@@ -103,6 +103,17 @@ curl -X POST 'https://auth.sitecorecloud.io/oauth/token' \
 OptiCore currently uses a JWT-based authentication approach for accessing Sitecore services. While the platform is capable of handling authentication internally via the Agent API, this method is not yet adopted in the current implementation. We plan to migrate to the Agent API in the near future to leverage built-in authentication handling and simplify credential management.
 
 - You have to generate `NEXT_PUBLIC_SITECORE_CLIENT_ID` and `NEXT_PUBLIC_SITECORE_CLIENT_SECRET` before you generate `NEXT_PUBLIC_TOKEN` from the deploy portal.
+
+```markdown
+In the Sitecore Cloud Portal, open SitecoreAI Deploy.
+Click `Credentials` > `Environment` > `Create credentials` > `Automation`.
+Fill out the automation client details, then click Create.
+Copy the client ID and the client secret because you won't be able to view them again in SitecoreAI Deploy. You'll use them to request a JWT.
+```
+
+After you generate `CLIENT_ID`, it will automatically generate `CLIENT_SECRET`.
+
+Please refer [Agent API Documentation](https://api-docs.sitecore.com/ai-capabilities/agent-api/section/authorization/create-an-automation-client) for more information.
 
 4. **Run Development Server:**
    `npm run dev
