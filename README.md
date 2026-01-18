@@ -1,6 +1,8 @@
-﻿# OptiCore: AI-Powered Content Intelligence for Sitecore
+﻿# OptiCore: AI-Powered Assistant for Sitecore AI
 
-**OptiCore** is a cutting-edge Sitecore Marketplace application designed to revolutionize content management through the power of Artificial Intelligence. By integrating seamlessly into the Sitecore ecosystem, OptiCore empowers content editors and marketers with real-time, intelligent insights to ensure content is optimized, compliant, and impactful.
+**OptiCore** is an innovative AI-powered solution designed to revolutionize how Sitecore Sales Engineers manage and maintain demo environments within XM Cloud. By automating tedious and time
+consuming tasks, OptiCore allows engineers to focus on high-value selling activities, ultimately enhancing the 
+demo experience for prospects and increasing sales conversion rates
 
 ## Key Features
 
@@ -51,7 +53,7 @@ Accelerate your creative workflow by generating on-brand assets without leaving 
 
 - Sitecore XM Cloud environment.
 - Access to Sitecore Marketplace.
-- API Keys for configured AI services.
+- API Keys for configured AI services and Sitecore APIs.
 
 ### Installation
 
@@ -63,11 +65,50 @@ Accelerate your creative workflow by generating on-brand assets without leaving 
    `npm install
 `
 
-3. **Run Development Server:**
+3. **Configure Environment Variables:**
+
+- Before you run the project add all the env variables. Please follow below steps.
+
+- Create a `.env` file in the root of the project.
+- Copy the contents from .env.example or use the template below and replace the placeholder values with your actual credentials:
+```bash
+   # Google AI Key
+   NEXT_PUBLIC_GEMINI_API_KEY=your_google_ai_api_key
+
+   # Sitecore Content Hub Credentials
+   CH_URL=https://your-instance.sitecoresandbox.cloud/en-us
+   CH_CLIENT_ID=your_content_hub_client_id
+   CH_CLIENT_SECRET=your_content_hub_client_secret
+
+   # Basic Sitecore Auth Credentials
+   NEXT_PUBLIC_SITECORE_CLIENT_ID=your_sitecore_client_id
+   NEXT_PUBLIC_SITECORE_CLIENT_SECRET=your_sitecore_client_secret
+   NEXT_PUBLIC_SITECORE_ENVIRONMENT_ID=dev
+   NEXT_PUBLIC_TOKEN=your_sitecore_token
+```  
+There is a file called `.env.example`. You can use that template also. ⚠️ Do not commit the `.env` file. It contains sensitive credentials.
+
+- You have to generate value for the `NEXT_PUBLIC_TOKEN` variable. For that run this command via bash terminal (include / replace your secrets)
+```bash
+curl -X POST 'https://auth.sitecorecloud.io/oauth/token' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'client_id=<NEXT_PUBLIC_SITECORE_CLIENT_ID>' \
+  --data-urlencode 'client_secret=<NEXT_PUBLIC_SITECORE_CLIENT_SECRET>' \
+  --data-urlencode 'grant_type=client_credentials' \
+  --data-urlencode 'audience=https://api.sitecorecloud.io'
+```
+
+**Athentication Note:**
+<br/>
+OptiCore currently uses a JWT-based authentication approach for accessing Sitecore services. While the platform is capable of handling authentication internally via the Agent API, this method is not yet adopted in the current implementation. We plan to migrate to the Agent API in the near future to leverage built-in authentication handling and simplify credential management.
+
+- You have to generate `NEXT_PUBLIC_SITECORE_CLIENT_ID` and `NEXT_PUBLIC_SITECORE_CLIENT_SECRET` before you generate `NEXT_PUBLIC_TOKEN` from the deploy portal.
+
+4. **Run Development Server:**
    `npm run dev
 `
 
-4. **Integration:**
+5. **Integration:**
 
    Configure your app in the Sitecore App Studio to connect it with your XM Cloud environment:
    - **Create the App:**
