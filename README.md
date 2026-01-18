@@ -74,6 +74,7 @@ Accelerate your creative workflow by generating on-brand assets without leaving 
 ```bash
    # Google AI Key
    NEXT_PUBLIC_GEMINI_API_KEY=your_google_ai_api_key
+   GEMINI_API_KEY=your_google_ai_api_key
 
    # Sitecore Content Hub Credentials
    CH_URL=https://your-instance.sitecoresandbox.cloud/en-us
