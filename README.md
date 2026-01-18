@@ -1,88 +1,84 @@
-# 🏪 Sitecore Marketplace Starter
+﻿# OptiCore: AI-Powered Content Intelligence for Sitecore
 
-This project is the starter template for building Sitecore Marketplace extensions. It demonstrates five extension points: **Custom Field**, **Dashboard Widget**, **Fullscreen**, **Pages Context Panel**, and **Standalone**. Each extension point has its own UI and integration with the Sitecore Marketplace SDK.
+**OptiCore** is a cutting-edge Sitecore Marketplace application designed to revolutionize content management through the power of Artificial Intelligence. By integrating seamlessly into the Sitecore ecosystem, OptiCore empowers content editors and marketers with real-time, intelligent insights to ensure content is optimized, compliant, and impactful.
 
-## 🧩 Extension Points
+## Key Features
 
-### 1. Custom Field Extension
+OptiCore brings together four powerful AI-driven capabilities into a single, cohesive interface:
 
-- **Location:** `app/custom-field-extension/page.tsx`
-- **Description:**  
-  Provides a button-based UI for selecting preset options to showcase how to update field values.
-  - Initializes the Marketplace SDK client.
-  - On button click,, updates the field value using client.setValue(selected) and closes the app after a short delay.
+### 1. Automated SEO (AI-Powered)
 
----
+Stop guessing with your SEO strategy. OptiCore analyzes your page content in real-time to maximize search engine visibility.
 
-### 2. Dashboard Widget Extension
+- **Deep Analysis:** Evaluates Title Tags, Meta Descriptions, Open Graph (OG) Tags, and Keywords against modern best practices.
+- **Smart Suggestions:** Uses Generative AI to provide context-aware recommendations for fixing issues (e.g., rewriting a meta description to improve click-through rates).
+- **Health Scoring:** Provides a clear visual "Status" (Pass, Warning, Fail) and an overall SEO score.
 
-- **Location:** `app/dashboard-widget-extension/page.tsx`
-- **Description:**  
-  Displays a widget in the XM Cloud dashboard.
-  - Initializes the Marketplace SDK client.
-  - Displays sample dashboard information.
+### 2. Link Healer (Broken Link Detection)
 
----
+Maintain a pristine user experience by automatically detecting and surfacing dead ends before your users do.
 
-### 3. Fullscreen Extension
+- **Comprehensive Scanning:** Scans the rendered HTML structure for broken anchor links and missing image resources.
+- **Severity Categorization:** Categorizes issues by severity (Critical, Warning, Info) to help prioritize fixes.
+- **Quality Metrics:** Calculates a page connectivity quality score to track improvement over time.
 
-- **Location:** `app/fullscreen-extension/page.tsx`
-- **Description:**  
-  Provides a fullscreen experience to be rendered in the Pages application.
-  - Initializes the Marketplace SDK client.
-  - Displays sample dashboard information.
+### 3. Brand Guardian (Compliance Analysis)
 
----
+Ensure every piece of content speaks with your brand's unique voice and adheres to corporate standards.
 
-### 4. Pages Context Panel Extension
+- **AI Tonal Analysis:** Leverages AI to read your page content and compare it against your specific **Brand Guidelines** (Voice, Tone, Mission, and Values).
+- **Narrative & Structure:** Checks for narrative alignment and structural integrity to ensure consistency across the site.
+- **Actionable Feedback:** Highlights specific areas where content deviates from brand standards and offers recommendations for alignment.
 
-- **Location:** `app/pages-contextpanel-extension/page.tsx`
-- **Description:**  
-  Displays context information about the current page in the XM Cloud Pages editor.
-  - Initializes the Marketplace SDK client.
-  - Subscribes to `pages.context` using the SDK to handle events.
-  - Shows page ID, title, language, and path.
-  - Updates data automatically as the user changes selected page.
+### 4. Content Hub Bridge (AI Content Generation)
 
----
+Accelerate your creative workflow by generating on-brand assets without leaving the Sitecore environment.
 
-### 5. Standalone Extension
+- **Generative AI:** Simply describe your vision, and OptiCore's AI generates high-quality visual assets.
+- **Context Awareness:** Generates assets that respect defined Brand definitions and aesthetics.
+- **Seamless Integration:** Direct integration with **Sitecore Content Hub** allows you to upload and manage generated assets instantly.
 
-- **Location:** `app/standalone-extension/page.tsx`
-- **Description:**  
-  Runs as a standalone app outside of other extension points.
-  - Initializes the Marketplace SDK client.
-  - Displays sample dashboard information.
+## Technology Stack
 
-# 📦 Getting Started
+- **Sitecore Marketplace SDK:** Deep integration with Sitecore Pages and Application context.
+- **Generative AI:** Powering the intelligent analysis, suggestions, and content creation.
+- **Next.js & React:** Delivering a responsive, tab-based user interface.
+- **Tailwind CSS / Shadcn UI:** For a modern and accessible component design.
 
-Note: You cannot access extension point routes directly in the browser (e.g., localhost:3000/...). These routes must be invoked within the Sitecore XM Cloud environment through the configured extension points.To learn how to properly configure and hook up your app to extension points, refer to the official [Sitecore Marketplace documentation](https://doc.sitecore.com/mp/en/developers/marketplace/extension-points.html)
+## Getting Started
 
+### Prerequisites
 
-1. Create Your Own Repository:
-   - You can either fork this repository or create a new template based on it.
-   - This gives you a clean starting point with all the necessary scaffolding for Marketplace extension development.
+- Sitecore XM Cloud environment.
+- Access to Sitecore Marketplace.
+- API Keys for configured AI services.
 
-2. Remove the endpoints you dont require
-   - Remove any extension points you don't plan to support by deleting their respective folders inside the app directory.
-   - Each folder in app corresponds to a specific extension point (e.g., custom-field-extension, dashboard-widget-extension, etc.).
+### Installation
 
-3. Install dependencies:
-   ```sh
-   npm install
-   ```
+1. **Clone the Repository:**
+   `git clone <repository-url>
+`
 
-4. Run the development server:
-   ```sh
-   npm run dev
-   ```
+2. **Install Dependencies:**
+   `npm install
+`
 
-5. Install the application and test in the different extension points by following the [Sitecore documentation](https://doc.sitecore.com/mp/en/developers/marketplace/introduction-to-sitecore-marketplace.html)
+3. **Run Development Server:**
+   `npm run dev
+`
 
-## 📝 License
+4. **Integration:**
 
-This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
+   Configure your app in the Sitecore App Studio to connect it with your XM Cloud environment:
+   - **Create the App:**
+     Navigate to the **App Studio** tab in the Sitecore Cloud Portal and create a new application.
 
-## 🐛 Issues
+   - **Configure Extension Point:**
+     Open your newly created app and select the **Extension points** tab. Enable the **Pages Context Panel** extension point and set the **Route URL** to `/opticore`.
 
-If you encounter any issues or have suggestions for improvements, please open an issue on the repository.
+   - **Set Deployment URL:**
+     In the **Deployment URL** field, enter the URL where your app is running.
+     - For local development: `http://localhost:3000`
+     - For production: Enter your publicly hosted application URL (e.g., Vercel, Netlify).
+
+   For more detailed guidance, refer to the official [Sitecore Marketplace documentation](https://doc.sitecore.com/mp/en/developers/marketplace/introduction-to-sitecore-marketplace.html).
