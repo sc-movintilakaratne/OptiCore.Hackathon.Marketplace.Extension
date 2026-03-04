@@ -58,19 +58,19 @@ function PagesContextPanel() {
         <div className="mt-8">
           <Tabs defaultValue="seo">
             <TabsList className="grid w-full grid-cols-2 h-auto mb-4 md:inline-flex md:w-auto md:h-9 mx-auto">
-              <TabsTrigger value="seo">Automated SEO</TabsTrigger>
-              <TabsTrigger value="links">Link Healer</TabsTrigger>
               <TabsTrigger value="compliance">Brand Guardian</TabsTrigger>
+              <TabsTrigger value="links">Link Healer</TabsTrigger>
+              <TabsTrigger value="seo">Automated SEO</TabsTrigger>
               <TabsTrigger value="generation">Content Hub Bridge</TabsTrigger>
             </TabsList>
-            <TabsContent value="seo">
-              <SeoAnalysisTab pageInfo={pagesContext} client={client} />
+            <TabsContent value="compliance">
+              <BrandComplianceTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="links">
               <BrokenLinkDetectionTab pageInfo={pagesContext} client={client} />
             </TabsContent>
-            <TabsContent value="compliance">
-              <BrandComplianceTab pageInfo={pagesContext} client={client} />
+            <TabsContent value="seo">
+              <SeoAnalysisTab pageInfo={pagesContext} client={client} />
             </TabsContent>
             <TabsContent value="generation">
               <ContentGenerationTab />
