@@ -1,5 +1,6 @@
 // src/lib/google-ai.ts
 import { GoogleGenAI } from "@google/genai";
+console.log("GEMINI_API_KEY present in route?", !!process.env.GEMINI_API_KEY);
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -37,7 +38,7 @@ export async function generateImage(prompt: string, brandStyle: string) {
 
     console.error(
       "Unexpected Response Structure:",
-      JSON.stringify(response, null, 2)
+      JSON.stringify(response, null, 2),
     );
     throw new Error("Google AI replied, but no image data was found.");
   } catch (error: any) {
@@ -46,7 +47,7 @@ export async function generateImage(prompt: string, brandStyle: string) {
     // Provide a clear error if billing fails again (though it shouldn't now!)
     if (error.message?.includes("403") || error.message?.includes("Billing")) {
       throw new Error(
-        "Billing permission denied. Double check your Project is linked to the Active Billing Account."
+        "Billing permission denied. Double check your Project is linked to the Active Billing Account.",
       );
     }
     throw error;
