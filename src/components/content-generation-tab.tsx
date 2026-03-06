@@ -6,7 +6,7 @@ import React, { useState } from "react";
 // 1. DEFINE YOUR BRANDS & IDs HERE
 // -----------------------------------------------------------------------------
 const BRAND_OPTIONS = [
-  { name: "Essential Living", id: "48016" },
+  { name: "Essential Living", id: "48017" },
   { name: "Skywings", id: "48107" },
   { name: "Forma-lux", id: "48016" },
   { name: "Nova-Medical", id: "48017" },
